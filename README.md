@@ -114,10 +114,11 @@ Pranata is engineered using standard web compilation libraries:
     npm install
     ```
 3.  **Configure Environment Variables**:
-    Create a `.env.local` file in the root directory:
+    Create a `.env` file in the root directory:
     ```env
     NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    TELEGRAM_BOT_TOKEN=your_telegram_bot_token
     ```
 4.  **Migrate Database**:
     Execute the PostgreSQL script inside [supabase/schema.sql](supabase/schema.sql) in your Supabase SQL Editor.

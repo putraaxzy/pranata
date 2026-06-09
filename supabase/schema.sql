@@ -9,7 +9,8 @@ create table if not exists public.profiles (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   display_name text,
   avatar_url text,
-  timezone_setting text default 'auto'
+  timezone_setting text default 'auto',
+  telegram_chat_id text default null
 );
 
 -- 2. Create schedules table
@@ -189,6 +190,140 @@ create trigger limit_user_sessions
   after insert on auth.sessions
   for each row execute procedure public.handle_session_limit();
 
+create or replace function public.get_telegram_user_profile(chat_id text)
+returns json as $$
+declare
+  result json;
+begin
+  select json_build_object(
+    'user_id', user_id,
+    'display_name', display_name,
+    'timezone_setting', timezone_setting
+  ) into result
+  from public.profiles
+  where telegram_chat_id = chat_id
+  limit 1;
+  return result;
+end;
+$$ language plpgsql security definer;
+
+create or replace function public.get_telegram_today_schedules(chat_id text, today_str text, today_dow int)
+returns json as $$
+declare
+  target_user_id uuid;
+  schedules_json json;
+begin
+  select user_id into target_user_id
+  from public.profiles
+  where telegram_chat_id = chat_id
+  limit 1;
+
+  if target_user_id is null then
+    return null;
+  end if;
+
+  select coalesce(json_agg(s), '[]'::json) into schedules_json
+  from (
+    select id, title, time, type, location, notes, is_recurring, recurring_days, completed_dates
+    from public.schedules
+    where user_id = target_user_id
+    and (
+      (is_recurring = false and date = today_str::date)
+      or (
+        is_recurring = true
+        and (recurring_days @> array[today_dow])
+        and (start_date is null or start_date <= today_str::date)
+        and (end_date is null or end_date >= today_str::date)
+        and (exception_dates is null or not (exception_dates @> array[today_str]))
+      )
+    )
+    order by time asc
+  ) s;
+
+  return schedules_json;
+end;
+$$ language plpgsql security definer;
+
+create or replace function public.get_telegram_pending_tasks(chat_id text)
+returns json as $$
+declare
+  target_user_id uuid;
+  tasks_json json;
+begin
+  select user_id into target_user_id
+  from public.profiles
+  where telegram_chat_id = chat_id
+  limit 1;
+
+  if target_user_id is null then
+    return null;
+  end if;
+
+  select coalesce(json_agg(t), '[]'::json) into tasks_json
+  from (
+    select id, title, priority, status, due_date, description, start_time, end_time
+    from public.tasks
+    where user_id = target_user_id
+    and status != 'done'
+    order by due_date asc nulls last, priority desc, created_at desc
+    limit 10
+  ) t;
+
+  return tasks_json;
+end;
+$$ language plpgsql security definer;
+
+create or replace function public.get_telegram_money_summary(chat_id text, month_start_str text)
+returns json as $$
+declare
+  target_user_id uuid;
+  income_total numeric := 0;
+  expense_total numeric := 0;
+  recent_tx_json json;
+  result json;
+begin
+  select user_id into target_user_id
+  from public.profiles
+  where telegram_chat_id = chat_id
+  limit 1;
+
+  if target_user_id is null then
+    return null;
+  end if;
+
+  select coalesce(sum(amount), 0) into income_total
+  from public.transactions
+  where user_id = target_user_id
+  and type = 'income'
+  and date >= month_start_str::date;
+
+  select coalesce(sum(amount), 0) into expense_total
+  from public.transactions
+  where user_id = target_user_id
+  and type = 'expense'
+  and date >= month_start_str::date;
+
+  select coalesce(json_agg(t), '[]'::json) into recent_tx_json
+  from (
+    select title, amount, type, category, date::text
+    from public.transactions
+    where user_id = target_user_id
+    and date >= month_start_str::date
+    order by date desc, created_at desc
+    limit 5
+  ) t;
+
+  select json_build_object(
+    'income', income_total,
+    'expense', expense_total,
+    'balance', income_total - expense_total,
+    'recent', recent_tx_json
+  ) into result;
+
+  return result;
+end;
+$$ language plpgsql security definer;
+
 -- Migration queries for updating existing databases to this schema version:
 --
 -- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS timezone_setting text DEFAULT 'auto';
@@ -203,3 +338,5 @@ create trigger limit_user_sessions
 -- ALTER TABLE public.tasks 
 --   ADD COLUMN IF NOT EXISTS start_time text DEFAULT null,
 --   ADD COLUMN IF NOT EXISTS end_time text DEFAULT null;
+--
+-- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS telegram_chat_id text DEFAULT null;

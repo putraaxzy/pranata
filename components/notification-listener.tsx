@@ -58,6 +58,18 @@ export function NotificationListener() {
 
         if (allSchedules.length === 0) return
 
+        const triggerTelegramNotification = async (title: string, body: string) => {
+          try {
+            await fetch('/api/telegram-notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, body }),
+            })
+          } catch (err) {
+            console.error('Failed to trigger Telegram notification:', err)
+          }
+        }
+
         const now = new Date()
 
         allSchedules.forEach((sched) => {
@@ -65,19 +77,24 @@ export function NotificationListener() {
             const departureTime = getMomentInTimezone(sched.calculated_departure_time, todayStr, tz)
             const diffSec = differenceInSeconds(departureTime, now)
 
+            const title = 'Time to Leave for Work!'
+            const body = `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`
+
             if (diffSec <= 0 && diffSec > -300) {
-              new Notification('Time to Leave for Work!', {
-                body: `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`,
+              new Notification(title, {
+                body,
                 requireInteraction: true,
                 tag: `departure-${sched.id}`,
               })
+              triggerTelegramNotification(title, body)
             } else if (diffSec > 0) {
               const tId = window.setTimeout(() => {
-                new Notification('Time to Leave for Work!', {
-                  body: `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`,
+                new Notification(title, {
+                  body,
                   requireInteraction: true,
                   tag: `departure-${sched.id}`,
                 })
+                triggerTelegramNotification(title, body)
               }, diffSec * 1000)
 
               timeoutsRef.current.push(tId)
@@ -96,19 +113,24 @@ export function NotificationListener() {
               ? `${sched.reminder_minutes / 60} hour(s)`
               : `${sched.reminder_minutes} minutes`
 
+            const title = `Upcoming: ${sched.title}${recurringLabel}`
+            const body = `Starting in ${reminderLabel} at ${eventTimeStr}.`
+
             if (diffSec <= 0 && diffSec > -300) {
-              new Notification(`Upcoming: ${sched.title}${recurringLabel}`, {
-                body: `Starting in ${reminderLabel} at ${eventTimeStr}.`,
+              new Notification(title, {
+                body,
                 requireInteraction: true,
                 tag: `reminder-${sched.id}`,
               })
+              triggerTelegramNotification(title, body)
             } else if (diffSec > 0) {
               const tId = window.setTimeout(() => {
-                new Notification(`Upcoming: ${sched.title}${recurringLabel}`, {
-                  body: `Starting in ${reminderLabel} at ${eventTimeStr}.`,
+                new Notification(title, {
+                  body,
                   requireInteraction: true,
                   tag: `reminder-${sched.id}`,
                 })
+                triggerTelegramNotification(title, body)
               }, diffSec * 1000)
 
               timeoutsRef.current.push(tId)

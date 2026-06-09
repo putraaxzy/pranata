@@ -513,7 +513,7 @@ export default function TodoPage() {
       <Dialog open={!!deletingId} onOpenChange={(v) => { if (!v) setDeletingId(null) }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-bold tracking-tight flex items-center gap-2 text-red-650">
+            <DialogTitle className="font-bold tracking-tight flex items-center gap-2 text-red-600">
               <AlertCircle className="size-5" />
               Delete Task
             </DialogTitle>
@@ -531,7 +531,7 @@ export default function TodoPage() {
             </Button>
             <Button
               onClick={handleDelete}
-              className="bg-red-650 hover:bg-red-700 text-stone-50"
+              className="bg-red-600 hover:bg-red-700 text-stone-50"
             >
               Delete
             </Button>

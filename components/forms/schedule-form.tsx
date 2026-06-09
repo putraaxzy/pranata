@@ -34,6 +34,10 @@ const scheduleSchema = z.object({
   work_start_time: z.string().optional().or(z.literal('')),
   travel_duration_minutes: z.number().min(0),
   traffic_buffer_minutes: z.number().min(0),
+  is_recurring: z.boolean().default(false),
+  recurring_days: z.array(z.number()).default([]),
+  timezone: z.string().min(1, 'Timezone is required'),
+  end_date: z.string().optional().or(z.literal('')),
 }).refine(data => {
   if (!data.is_bulk && data.endTime && !data.startTime) {
     return false
@@ -89,50 +93,6 @@ interface ScheduleFormProps {
   }
 }
 
-function parseScheduleLine(line: string) {
-  const trimmed = line.trim()
-  if (!trimmed) return null
-  const rangeRegex = /^(\d{1,2})[\.:](\d{2})\s*-\s*(\d{1,2})[\.:](\d{2})\s*(.*)$/
-  const rangeMatch = trimmed.match(rangeRegex)
-  if (rangeMatch) {
-    const startH = rangeMatch[1].padStart(2, '0')
-    const startM = rangeMatch[2]
-    const endH = rangeMatch[3].padStart(2, '0')
-    const endM = rangeMatch[4]
-    const title = rangeMatch[5].trim().replace(/^[-:\s]+/, '')
-    return {
-      time: `${startH}:${startM} - ${endH}:${endM}`,
-      title: title || 'Untitled Event'
-    }
-  }
-  const singleRegex = /^(\d{1,2})[\.:](\d{2})\s*(.*)$/
-  const singleMatch = trimmed.match(singleRegex)
-  if (singleMatch) {
-    const h = singleMatch[1].padStart(2, '0')
-    const m = singleMatch[2]
-    const title = singleMatch[3].trim().replace(/^[-:\s]+/, '')
-    return {
-      time: `${h}:${m}`,
-      title: title || 'Untitled Event'
-    }
-  }
-  return {
-    time: null,
-    title: trimmed
-  }
-}
-
-const timezones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC', 'Asia/Jakarta', 'America/New_York', 'Europe/London']
-const daysOfWeek = [
-  { id: 1, label: 'Mon' },
-  { id: 2, label: 'Tue' },
-  { id: 3, label: 'Wed' },
-  { id: 4, label: 'Thu' },
-  { id: 5, label: 'Fri' },
-  { id: 6, label: 'Sat' },
-  { id: 0, label: 'Sun' },
-]
-
 export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const [loading, setLoading] = useState(false)
   const [isBulkMode, setIsBulkMode] = useState(false)
@@ -157,6 +117,10 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
       work_start_time: initialValues?.work_start_time || '08:00',
       travel_duration_minutes: initialValues?.travel_duration_minutes ?? 25,
       traffic_buffer_minutes: initialValues?.traffic_buffer_minutes ?? 15,
+      is_recurring: initialValues?.is_recurring || false,
+      recurring_days: initialValues?.recurring_days || [],
+      timezone: initialValues?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      end_date: initialValues?.end_date || '',
     },
   })
 
@@ -164,6 +128,8 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const workStartTime = useWatch({ control: form.control, name: 'work_start_time' })
   const travelMins = useWatch({ control: form.control, name: 'travel_duration_minutes' })
   const bufferMins = useWatch({ control: form.control, name: 'traffic_buffer_minutes' })
+  const isRecurring = useWatch({ control: form.control, name: 'is_recurring' })
+  const currentDays = useWatch({ control: form.control, name: 'recurring_days' }) || []
 
   let calcDeparture = ''
   if (type === 'work_departure' && workStartTime) {
@@ -306,8 +272,8 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
               form.setValue('is_bulk', false)
             }}
             className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${!isBulkMode
-                ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
-                : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
+              ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
+              : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
               }`}
           >
             Single Event
@@ -319,8 +285,8 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
               form.setValue('is_bulk', true)
             }}
             className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${isBulkMode
-                ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
-                : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
+              ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
+              : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
               }`}
           >
             Bulk Paste
@@ -388,8 +354,8 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                   type="button"
                   onClick={() => toggleRecurringDay(idx)}
                   className={`text-[10px] font-semibold py-2 rounded-lg border transition-all ${recurringDays.includes(idx)
-                      ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-950 dark:border-stone-100 shadow-sm'
-                      : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-700 dark:hover:border-stone-500'
+                    ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-950 dark:border-stone-100 shadow-sm'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-700 dark:hover:border-stone-500'
                     }`}
                 >
                   {label}
@@ -490,6 +456,92 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="sched-timezone">Timezone</Label>
+          <div className="flex gap-2">
+            <Select
+              onValueChange={(value) => form.setValue('timezone', value)}
+              value={form.watch('timezone')}
+            >
+              <SelectTrigger id="sched-timezone" className="flex-1">
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent>
+                {timezones.map(tz => (
+                  <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => form.setValue('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)}
+              className="shrink-0 text-xs px-2"
+              title="Auto-detect local timezone"
+            >
+              Auto
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-stone-50/50 dark:bg-stone-900/40 space-y-3">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="sched-recurring"
+            checked={isRecurring}
+            onCheckedChange={(c) => form.setValue('is_recurring', !!c)}
+          />
+          <Label htmlFor="sched-recurring" className="font-semibold cursor-pointer">Recurring Event</Label>
+        </div>
+
+        {isRecurring && (
+          <div className="space-y-3 pt-2 pl-6">
+            <div className="space-y-2">
+              <Label className="text-xs">Repeat on days:</Label>
+              <div className="flex flex-wrap gap-2">
+                {daysOfWeek.map(day => {
+                  const isSelected = currentDays.includes(day.id)
+                  return (
+                    <button
+                      key={day.id}
+                      type="button"
+                      onClick={() => {
+                        const newDays = isSelected
+                          ? currentDays.filter(d => d !== day.id)
+                          : [...currentDays, day.id]
+                        form.setValue('recurring_days', newDays)
+                      }}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${isSelected
+                        ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-900 dark:border-stone-100'
+                        : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
+                        }`}
+                    >
+                      {day.label}
+                    </button>
+                  )
+                })}
+              </div>
+              {isRecurring && currentDays.length === 0 && (
+                <p className="text-[10px] text-red-500">Please select at least one day.</p>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="sched-end-date" className="text-xs">End Date (Optional)</Label>
+              <Input
+                id="sched-end-date"
+                type="date"
+                {...form.register('end_date')}
+                className="max-w-[200px]"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

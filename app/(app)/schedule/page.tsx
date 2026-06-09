@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, Clock, MapPin, Trash2, Edit2, Plus, Compass, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, MapPin, Trash2, Edit2, Plus, Compass, AlertCircle, Repeat, Globe } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { ScheduleForm } from '@/components/forms/schedule-form'
 import { toast } from 'sonner'
-import { format, parseISO, isToday, isTomorrow } from 'date-fns'
+import { format, parseISO, isToday, isTomorrow, addDays, getDay, isBefore, isAfter, startOfDay } from 'date-fns'
+import { formatInTimeZone, toDate } from 'date-fns-tz'
 
 interface Schedule {
   id: string
@@ -28,6 +29,12 @@ interface Schedule {
   travel_duration_minutes?: number
   traffic_buffer_minutes?: number
   calculated_departure_time?: string
+  is_recurring?: boolean
+  recurring_days?: number[]
+  timezone?: string
+  end_date?: string
+  displayTime?: string
+  isDifferentTz?: boolean
 }
 
 export default function SchedulePage() {
@@ -172,11 +179,53 @@ export default function SchedulePage() {
 
   const groupSchedulesByDate = () => {
     const groups: { [key: string]: Schedule[] } = {}
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const today = startOfDay(new Date())
+    const maxProjectionDate = addDays(today, 30)
+
     schedules.forEach(s => {
-      if (!groups[s.date]) {
-        groups[s.date] = []
+      let displayTime = s.time
+      let isDifferentTz = false
+      if (s.timezone && s.time && s.timezone !== localTz) {
+        try {
+          const eventDate = toDate(`${s.date}T${s.time}`, { timeZone: s.timezone })
+          displayTime = formatInTimeZone(eventDate, localTz, 'HH:mm')
+          isDifferentTz = true
+        } catch (e) {
+          // fallback todo
+        }
       }
-      groups[s.date].push(s)
+
+      const sForDisplay = { ...s, displayTime, isDifferentTz }
+
+      if (s.is_recurring && s.recurring_days && s.recurring_days.length > 0) {
+        const startD = parseISO(s.date)
+        const endD = s.end_date ? parseISO(s.end_date) : maxProjectionDate
+        const limitDate = isBefore(endD, maxProjectionDate) ? endD : maxProjectionDate
+
+        let currentD = startD
+        while (!isAfter(currentD, limitDate)) {
+          if (!isBefore(currentD, today) && s.recurring_days.includes(getDay(currentD))) {
+            const dateStr = format(currentD, 'yyyy-MM-dd')
+            if (!groups[dateStr]) groups[dateStr] = []
+            groups[dateStr].push({ ...sForDisplay, id: `${s.id}-${dateStr}` })
+          }
+          currentD = addDays(currentD, 1)
+        }
+      } else {
+        if (!groups[s.date]) {
+          groups[s.date] = []
+        }
+        groups[s.date].push(sForDisplay)
+      }
+    })
+
+    Object.keys(groups).forEach(dateStr => {
+      groups[dateStr].sort((a, b) => {
+        if (!a.time) return -1
+        if (!b.time) return 1
+        return a.time.localeCompare(b.time)
+      })
     })
 
     return groups
@@ -350,7 +399,7 @@ export default function SchedulePage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setEditingSchedule(item)}
+                          onClick={() => setEditingSchedule(schedules.find(s => s.id === item.id.split('-')[0]) || item)}
                           className="size-9 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
                         >
                           <Edit2 className="size-4" />
@@ -359,7 +408,7 @@ export default function SchedulePage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDeletingId(item.id)}
+                          onClick={() => setDeletingId(item.id.split('-')[0])}
                           className="size-9 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
                         >
                           <Trash2 className="size-4" />

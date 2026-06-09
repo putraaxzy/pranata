@@ -24,42 +24,36 @@ export default async function DashboardPage() {
   }
 
   try {
-    const { data: profile, error: profileErr } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
     const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const { data: schedules, error: schedErr } = await supabase
-      .from('schedules')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('date', todayStr)
-      .order('time', { ascending: true })
+    const currentMonthStr = format(new Date(), 'yyyy-MM-01')
 
+    const [
+      profileResult,
+      schedulesResult,
+      tasksResult,
+      transactionsResult,
+      notesResult,
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      supabase.from('schedules').select('*').eq('user_id', user.id).eq('date', todayStr).order('time', { ascending: true }),
+      supabase.from('tasks').select('*').eq('user_id', user.id).neq('status', 'done').order('due_date', { ascending: true, nullsFirst: false }).limit(5),
+      supabase.from('transactions').select('*').eq('user_id', user.id).gte('date', currentMonthStr),
+      supabase.from('notes').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(3)
+    ])
+
+    const { data: profile, error: profileErr } = profileResult
+    const { data: schedules, error: schedErr } = schedulesResult
+    const { data: tasks, error: taskErr } = tasksResult
+    const { data: transactions, error: txErr } = transactionsResult
+    const { data: notes, error: noteErr } = notesResult
+
+    if (profileErr) throw profileErr
     if (schedErr) throw schedErr
+    if (taskErr) throw taskErr
+    if (txErr) throw txErr
+    if (noteErr) throw noteErr
 
     const departureSchedule = schedules?.find((s) => s.type === 'work_departure')
-
-    const { data: tasks, error: taskErr } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .neq('status', 'done')
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .limit(5)
-
-    if (taskErr) throw taskErr
-
-    const currentMonthStr = format(new Date(), 'yyyy-MM-01')
-    const { data: transactions, error: txErr } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('date', currentMonthStr)
-
-    if (txErr) throw txErr
 
     let totalIncome = 0
     let totalExpense = 0
@@ -71,15 +65,6 @@ export default async function DashboardPage() {
       }
     })
     const netBalance = totalIncome - totalExpense
-
-    const { data: notes, error: noteErr } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(3)
-
-    if (noteErr) throw noteErr
 
     return (
       <div className="space-y-6">

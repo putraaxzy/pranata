@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Square, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
@@ -23,7 +23,7 @@ interface TaskListProps {
 
 export function TaskList({ initialTasks }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const handleToggleComplete = async (taskId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'done' ? 'pending' : 'done'

@@ -167,6 +167,28 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+create or replace function public.handle_session_limit()
+returns trigger as $$
+begin
+  delete from auth.sessions
+  where user_id = new.user_id
+  and id not in (
+    select id
+    from auth.sessions
+    where user_id = new.user_id
+    order by created_at desc
+    limit 5
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists limit_user_sessions on auth.sessions;
+
+create trigger limit_user_sessions
+  after insert on auth.sessions
+  for each row execute procedure public.handle_session_limit();
+
 -- Migration queries for updating existing databases to this schema version:
 --
 -- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS timezone_setting text DEFAULT 'auto';

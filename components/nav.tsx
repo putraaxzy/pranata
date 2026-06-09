@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -26,7 +26,7 @@ interface NavigationProps {
 export function Navigation({ userEmail }: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [timezone, setTimezone] = useState<string>('auto')
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export function Navigation({ userEmail }: NavigationProps) {
   }
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) {
       toast.error(error.message)
     } else {
@@ -229,10 +229,10 @@ export function Navigation({ userEmail }: NavigationProps) {
 
 export function LogoutButton() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) {
       toast.error(error.message)
     } else {

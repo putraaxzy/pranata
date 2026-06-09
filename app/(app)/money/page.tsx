@@ -374,7 +374,7 @@ export default function MoneyTrackerPage() {
             </Button>
             <Button
               onClick={handleDelete}
-              className="bg-red-650 hover:bg-red-700 text-stone-50"
+              className="bg-red-600 hover:bg-red-700 text-stone-50"
             >
               Delete
             </Button>

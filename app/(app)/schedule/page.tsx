@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Calendar, Clock, MapPin, Trash2, Edit2, Plus, Compass, AlertCircle, Repeat, Globe } from 'lucide-react'
+import { Calendar, Clock, MapPin, Trash2, Edit2, Plus, Compass, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +16,21 @@ import { ScheduleForm } from '@/components/forms/schedule-form'
 import { toast } from 'sonner'
 import { format, parseISO, isToday, isTomorrow, addDays, getDay, isBefore, isAfter, startOfDay } from 'date-fns'
 import { formatInTimeZone, toDate } from 'date-fns-tz'
+
+const DAY_LABELS: { [key: number]: string } = {
+  0: 'Sun',
+  1: 'Mon',
+  2: 'Tue',
+  3: 'Wed',
+  4: 'Thu',
+  5: 'Fri',
+  6: 'Sat'
+}
+
+const getTodayStr = (tz: string) => {
+  const timeZone = tz === 'auto' ? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC') : tz
+  return formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd')
+}
 
 interface Schedule {
   id: string
@@ -32,7 +47,11 @@ interface Schedule {
   is_recurring?: boolean
   recurring_days?: number[]
   timezone?: string
+  start_date?: string
   end_date?: string
+  completed_dates?: string[]
+  is_done?: boolean
+  exception_dates?: string[]
   displayTime?: string
   isDifferentTz?: boolean
 }
@@ -108,59 +127,6 @@ export default function SchedulePage() {
     }
   }
 
-  const handleToggleDone = async (item: Schedule) => {
-    const todayStr = getTodayStr(timezone)
-
-    if (item.is_recurring) {
-      const currentDates = item.completed_dates || []
-      const alreadyDone = currentDates.includes(todayStr)
-      const nextDates = alreadyDone
-        ? currentDates.filter(d => d !== todayStr)
-        : [...currentDates, todayStr]
-
-      setSchedules(prev =>
-        prev.map(s => (s.id === item.id ? { ...s, completed_dates: nextDates } : s))
-      )
-
-      try {
-        const { error } = await supabase
-          .from('schedules')
-          .update({ completed_dates: nextDates })
-          .eq('id', item.id)
-
-        if (error) throw error
-        toast.success(alreadyDone ? 'Marked as active' : 'Marked as done for today')
-      } catch {
-        setSchedules(prev =>
-          prev.map(s => (s.id === item.id ? { ...s, completed_dates: currentDates } : s))
-        )
-        toast.error('Could not update schedule')
-      }
-    } else {
-      const currentDone = item.is_done
-      const nextDone = !currentDone
-
-      setSchedules(prev =>
-        prev.map(s => (s.id === item.id ? { ...s, is_done: nextDone } : s))
-      )
-
-      try {
-        const { error } = await supabase
-          .from('schedules')
-          .update({ is_done: nextDone })
-          .eq('id', item.id)
-
-        if (error) throw error
-        toast.success(nextDone ? 'Marked as done' : 'Marked as active')
-      } catch {
-        setSchedules(prev =>
-          prev.map(s => (s.id === item.id ? { ...s, is_done: currentDone } : s))
-        )
-        toast.error('Could not update schedule')
-      }
-    }
-  }
-
   const getScheduleBadge = (type: string) => {
     switch (type) {
       case 'work':
@@ -173,9 +139,6 @@ export default function SchedulePage() {
         return 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
     }
   }
-
-  const recurringSchedules = schedules.filter(s => s.is_recurring)
-  const datedSchedules = schedules.filter(s => !s.is_recurring)
 
   const groupSchedulesByDate = () => {
     const groups: { [key: string]: Schedule[] } = {}
@@ -199,7 +162,7 @@ export default function SchedulePage() {
       const sForDisplay = { ...s, displayTime, isDifferentTz }
 
       if (s.is_recurring && s.recurring_days && s.recurring_days.length > 0) {
-        const startD = parseISO(s.date)
+        const startD = s.date ? parseISO(s.date) : today
         const endD = s.end_date ? parseISO(s.end_date) : maxProjectionDate
         const limitDate = isBefore(endD, maxProjectionDate) ? endD : maxProjectionDate
 
@@ -212,7 +175,7 @@ export default function SchedulePage() {
           }
           currentD = addDays(currentD, 1)
         }
-      } else {
+      } else if (s.date) {
         if (!groups[s.date]) {
           groups[s.date] = []
         }
@@ -247,73 +210,68 @@ export default function SchedulePage() {
     return days.map(d => DAY_LABELS[d]).join(', ')
   }
 
-  const formatReminderLabel = (mins: number) => {
-    if (mins >= 60) return `${mins / 60}h before`
-    return `${mins}m before`
-  }
-
   const scheduleGroups = groupSchedulesByDate()
   const sortedDates = Object.keys(scheduleGroups).sort()
   const todayStr = getTodayStr(timezone)
 
-  const renderScheduleCard = (item: Schedule) => {
-    const isDone = item.is_recurring
-      ? (item.completed_dates ? item.completed_dates.includes(todayStr) : false)
-      : item.is_done
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
+            Schedule Planner
+          </h1>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+            Organize your meetings, tasks, and travel times.
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsAddOpen(true)}
+          className="bg-stone-900 hover:bg-stone-800 text-stone-50 dark:bg-stone-100 dark:hover:bg-stone-200 dark:text-stone-950 gap-2 rounded-xl w-full sm:w-auto justify-center shrink-0"
+        >
+          <Plus className="size-4" />
+          Add Event
+        </Button>
+      </div>
 
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
-              Schedule Planner
-            </h1>
-            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-              Organize your meetings, tasks, and travel times.
-            </p>
-          </div>
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2].map(n => (
+            <div key={n} className="space-y-2">
+              <div className="h-6 w-40 bg-stone-200 dark:bg-stone-800 rounded animate-pulse" />
+              <div className="h-20 w-full bg-stone-100 dark:bg-stone-900 rounded-xl animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : schedules.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-stone-200 rounded-2xl bg-white dark:border-stone-800 dark:bg-stone-900/40">
+          <Calendar className="size-10 text-stone-400 mb-3" />
+          <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200">No events scheduled</h3>
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-[240px]">
+            Keep track of workouts, meetings, and calculate travel times.
+          </p>
           <Button
             onClick={() => setIsAddOpen(true)}
-            className="bg-stone-900 hover:bg-stone-800 text-stone-50 dark:bg-stone-100 dark:hover:bg-stone-200 dark:text-stone-950 gap-2 rounded-xl w-full sm:w-auto justify-center shrink-0"
+            variant="outline"
+            className="mt-4 border-stone-200 hover:bg-stone-50 dark:border-stone-850 dark:hover:bg-stone-850 text-xs"
           >
-            <Plus className="size-4" />
-            Add Event
+            Create your first event
           </Button>
         </div>
+      ) : (
+        <div className="space-y-6">
+          {sortedDates.map(dateStr => (
+            <div key={dateStr} className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400" suppressHydrationWarning>
+                {formatGroupHeader(dateStr)}
+              </h3>
+              <div className="grid gap-3">
+                {scheduleGroups[dateStr].map(item => {
+                  const isDone = item.is_recurring
+                    ? (item.completed_dates ? item.completed_dates.includes(todayStr) : false)
+                    : item.is_done
 
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2].map(n => (
-              <div key={n} className="space-y-2">
-                <div className="h-6 w-40 bg-stone-200 dark:bg-stone-800 rounded animate-pulse" />
-                <div className="h-20 w-full bg-stone-100 dark:bg-stone-900 rounded-xl animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : schedules.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-stone-200 rounded-2xl bg-white dark:border-stone-800 dark:bg-stone-900/40">
-            <Calendar className="size-10 text-stone-400 mb-3" />
-            <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-200">No events scheduled</h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-[240px]">
-              Keep track of workouts, meetings, and calculate travel times.
-            </p>
-            <Button
-              onClick={() => setIsAddOpen(true)}
-              variant="outline"
-              className="mt-4 border-stone-200 hover:bg-stone-50 dark:border-stone-850 dark:hover:bg-stone-850 text-xs"
-            >
-              Create your first event
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {sortedDates.map(dateStr => (
-              <div key={dateStr} className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400" suppressHydrationWarning>
-                  {formatGroupHeader(dateStr)}
-                </h3>
-                <div className="grid gap-3">
-                  {scheduleGroups[dateStr].map(item => (
+                  return (
                     <Card
                       key={item.id}
                       className="border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 shadow-sm relative overflow-hidden group"
@@ -324,10 +282,10 @@ export default function SchedulePage() {
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded capitalize ${getScheduleBadge(item.type)}`}>
                               {item.type.replace('_', ' ')}
                             </span>
-                            {item.time && (
+                            {item.displayTime && (
                               <span className="text-xs font-bold font-mono text-stone-600 dark:text-stone-400 flex items-center gap-1">
                                 <Clock className="size-3 text-stone-400" />
-                                {item.time}
+                                {item.displayTime}
                               </span>
                             )}
                           </div>
@@ -393,37 +351,36 @@ export default function SchedulePage() {
                             </div>
                           )}
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 sm:self-center shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingSchedule(schedules.find(s => s.id === item.id.split('-')[0]) || item)}
-                          className="size-9 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
-                        >
-                          <Edit2 className="size-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeletingId(item.id.split('-')[0])}
-                          className="size-9 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
-                        >
-                          <Trash2 className="size-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <div className="flex items-center gap-2 sm:self-center shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingSchedule(schedules.find(s => s.id === item.id.split('-')[0]) || item)}
+                            className="size-9 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
+                          >
+                            <Edit2 className="size-4" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingId(item.id.split('-')[0])}
+                            className="size-9 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
+                          >
+                            <Trash2 className="size-4" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
-        ))}
-      </div>
-    )
-  }
+          ))}
+        </div>
+      )}
 
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
@@ -492,6 +449,6 @@ export default function SchedulePage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   )
 }

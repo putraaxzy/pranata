@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Compass, Clock, MapPin, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { differenceInMinutes } from 'date-fns'
+import { getTodayStr } from '@/lib/timezone'
 
 interface DepartureSchedule {
   id: string
@@ -13,13 +14,17 @@ interface DepartureSchedule {
   traffic_buffer_minutes: number
   calculated_departure_time: string
   location?: string
+  is_done?: boolean
+  is_recurring?: boolean
+  completed_dates?: string[] | null
 }
 
 interface DepartureWidgetProps {
   schedule?: DepartureSchedule
+  timezone?: string
 }
 
-export function DepartureWidget({ schedule }: DepartureWidgetProps) {
+export function DepartureWidget({ schedule, timezone = 'auto' }: DepartureWidgetProps) {
   const [timeLeft, setTimeLeft] = useState<string>('')
   const [status, setStatus] = useState<'pending' | 'due_soon' | 'overdue' | 'none'>('none')
 
@@ -31,6 +36,17 @@ export function DepartureWidget({ schedule }: DepartureWidgetProps) {
       if (!schedule || !schedule.calculated_departure_time) {
         setStatus('none')
         setTimeLeft('')
+        return
+      }
+
+      const todayStr = getTodayStr(timezone)
+      const isCompleted = schedule.is_recurring
+        ? (schedule.completed_dates ? schedule.completed_dates.includes(todayStr) : false)
+        : schedule.is_done
+
+      if (isCompleted) {
+        setStatus('overdue')
+        setTimeLeft('Departed')
         return
       }
 
@@ -64,7 +80,7 @@ export function DepartureWidget({ schedule }: DepartureWidgetProps) {
       clearTimeout(timeoutId)
       clearInterval(intervalId)
     }
-  }, [schedule])
+  }, [schedule, timezone])
 
   if (status === 'none') {
     return (

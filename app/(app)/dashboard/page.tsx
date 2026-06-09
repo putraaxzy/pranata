@@ -83,11 +83,11 @@ export default async function DashboardPage() {
 
     departureSchedule = schedules?.find((item) => {
       if (item.type !== 'work_departure') return false
-      if (item.is_recurring) {
-        return !item.completed_dates || !item.completed_dates.includes(todayStr)
-      }
-      return !item.is_done
-    })
+      const isCompleted = item.is_recurring
+        ? (item.completed_dates ? item.completed_dates.includes(todayStr) : false)
+        : item.is_done
+      return !isCompleted
+    }) || schedules?.find((item) => item.type === 'work_departure')
 
     transactions?.forEach((item) => {
       if (item.type === 'income') {
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <DepartureWidget schedule={departureSchedule} />
+          <DepartureWidget schedule={departureSchedule} timezone={tz} />
 
           <ScheduleList schedules={schedules || []} timezone={tz} />
 

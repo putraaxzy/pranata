@@ -92,7 +92,7 @@ export function QuickAddFab() {
               <Button
                 variant="outline"
                 onClick={() => setView('schedule')}
-                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-55 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
+                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-50 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
               >
                 <Calendar className="size-6 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm font-medium text-stone-850 dark:text-stone-200">Schedule</span>
@@ -101,7 +101,7 @@ export function QuickAddFab() {
               <Button
                 variant="outline"
                 onClick={() => setView('task')}
-                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-55 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
+                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-50 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
               >
                 <CheckSquare className="size-6 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm font-medium text-stone-850 dark:text-stone-200">Task</span>
@@ -110,7 +110,7 @@ export function QuickAddFab() {
               <Button
                 variant="outline"
                 onClick={() => setView('note')}
-                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-55 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
+                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-50 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
               >
                 <FileText className="size-6 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm font-medium text-stone-850 dark:text-stone-200">Note</span>
@@ -119,7 +119,7 @@ export function QuickAddFab() {
               <Button
                 variant="outline"
                 onClick={() => setView('transaction')}
-                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-55 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
+                className="flex flex-col items-center justify-center h-28 gap-2 border-stone-200 hover:bg-stone-50 hover:border-stone-900 dark:border-stone-800 dark:hover:bg-stone-800/50 dark:hover:border-stone-100 rounded-xl transition-all"
               >
                 <Coins className="size-6 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm font-medium text-stone-850 dark:text-stone-200">Money</span>

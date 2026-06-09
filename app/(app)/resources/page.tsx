@@ -201,7 +201,7 @@ export default function ResourcesPage() {
                   )}
 
                   {res.notes && (
-                    <p className="text-xs text-stone-550 dark:text-stone-405 bg-stone-50 dark:bg-stone-955 p-2 rounded border border-stone-100 dark:border-stone-900 leading-relaxed">
+                    <p className="text-xs text-stone-500 dark:text-stone-400 bg-stone-50 dark:bg-stone-955 p-2 rounded border border-stone-100 dark:border-stone-900 leading-relaxed">
                       {res.notes}
                     </p>
                   )}

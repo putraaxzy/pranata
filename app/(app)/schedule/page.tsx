@@ -171,7 +171,7 @@ export default function SchedulePage() {
         <div className="space-y-6">
           {sortedDates.map(dateStr => (
             <div key={dateStr} className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400" suppressHydrationWarning>
                 {formatGroupHeader(dateStr)}
               </h3>
               <div className="grid gap-3">
@@ -210,7 +210,7 @@ export default function SchedulePage() {
                         )}
 
                         {item.type === 'work_departure' && (
-                          <div className="border border-stone-200 bg-stone-55/40 dark:border-stone-800 dark:bg-stone-950/40 p-3 rounded-lg flex flex-col gap-1.5 mt-2 max-w-md">
+                          <div className="border border-stone-200 bg-stone-50/40 dark:border-stone-800 dark:bg-stone-950/40 p-3 rounded-lg flex flex-col gap-1.5 mt-2 max-w-md">
                             <p className="text-xs text-stone-600 dark:text-stone-400 flex items-center justify-between">
                               <span>Work Start:</span>
                               <strong className="font-semibold text-stone-800 dark:text-stone-200">{item.work_start_time}</strong>

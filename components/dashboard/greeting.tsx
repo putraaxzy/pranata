@@ -66,9 +66,9 @@ export function Greeting({ displayName }: GreetingProps) {
             Pranata Personal Dashboard
           </p>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-stone-555 font-medium">
+        <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
           <Calendar className="size-4 text-stone-400" />
-          <span>{todayStr}</span>
+          <span suppressHydrationWarning>{todayStr}</span>
         </div>
       </div>
 

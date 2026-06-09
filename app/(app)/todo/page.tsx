@@ -305,7 +305,7 @@ export default function TodoPage() {
                     </h3>
                     
                     {task.description && (
-                      <p className="text-xs text-stone-550 dark:text-stone-400 line-clamp-2 pr-2">
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 pr-2">
                         {task.description}
                       </p>
                     )}
@@ -318,7 +318,7 @@ export default function TodoPage() {
                         {task.status.replace('_', ' ')}
                       </span>
                       {task.due_date && (
-                        <span className="text-[10px] text-stone-400 font-mono">
+                        <span className="text-[10px] text-stone-400 font-mono" suppressHydrationWarning>
                           Due: {format(parseISO(task.due_date), 'MMM d, yyyy')}
                         </span>
                       )}

@@ -54,9 +54,9 @@ export function TaskList({ initialTasks }: TaskListProps) {
       case 'high':
         return 'text-red-600 bg-red-50 dark:bg-red-950/20 dark:text-red-400'
       case 'medium':
-        return 'text-amber-800 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-500'
+        return 'text-stone-800 bg-stone-100 dark:bg-stone-800 dark:text-stone-200'
       default:
-        return 'text-stone-600 bg-stone-50 dark:bg-stone-800 dark:text-stone-400'
+        return 'text-stone-600 bg-stone-50/50 dark:bg-stone-850/40 dark:text-stone-400'
     }
   }
 
@@ -66,10 +66,10 @@ export function TaskList({ initialTasks }: TaskListProps) {
     <Card className="border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 shadow-sm">
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium text-stone-600 dark:text-stone-400 flex items-center gap-2">
-          <CheckCircle2 className="size-4 text-amber-800 dark:text-amber-500" />
+          <CheckCircle2 className="size-4 text-stone-900 dark:text-stone-100" />
           Upcoming Tasks
         </CardTitle>
-        <Link href="/todo" className="text-xs text-amber-800 dark:text-amber-500 hover:underline flex items-center gap-0.5 font-medium">
+        <Link href="/todo" className="text-xs text-stone-900 dark:text-stone-100 hover:underline flex items-center gap-0.5 font-medium">
           View All
           <ChevronRight className="size-3" />
         </Link>
@@ -86,14 +86,14 @@ export function TaskList({ initialTasks }: TaskListProps) {
                 <div className="flex items-start gap-2.5 min-w-0">
                   <button
                     onClick={() => handleToggleComplete(task.id, task.status)}
-                    className="mt-0.5 text-stone-400 hover:text-amber-800 dark:hover:text-amber-500 transition-colors shrink-0"
+                    className="mt-0.5 text-stone-400 hover:text-stone-850 dark:hover:text-stone-100 transition-colors shrink-0"
                   >
                     <Square className="size-4.5" />
                   </button>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">{task.title}</p>
                     {task.due_date && (
-                      <p className="text-[11px] text-stone-400 mt-0.5 font-mono">
+                      <p className="text-[11px] text-stone-400 mt-0.5 font-mono" suppressHydrationWarning>
                         Due: {format(parseISO(task.due_date), 'MMM d, yyyy')}
                       </p>
                     )}

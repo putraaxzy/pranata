@@ -26,14 +26,14 @@ export function FinanceSummary({ income, expense, balance }: FinanceSummaryProps
     <Card className="border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-stone-600 dark:text-stone-400 flex items-center gap-2">
-          <Coins className="size-4 text-amber-800 dark:text-amber-500" />
+          <Coins className="size-4 text-stone-900 dark:text-stone-100" />
           Finance Summary (This Month)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between bg-stone-50 dark:bg-stone-950 p-3.5 rounded-xl border border-stone-100 dark:border-stone-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-500">
+            <div className="p-2 rounded-lg bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100">
               <Wallet className="size-4" />
             </div>
             <div>
@@ -76,7 +76,7 @@ export function FinanceSummary({ income, expense, balance }: FinanceSummaryProps
             <div className="h-1.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  expenseRatio > 90 ? 'bg-red-500' : expenseRatio > 70 ? 'bg-amber-500' : 'bg-amber-800'
+                  expenseRatio > 90 ? 'bg-red-500' : expenseRatio > 70 ? 'bg-stone-500' : 'bg-stone-900'
                 }`}
                 style={{ width: `${Math.min(expenseRatio, 100)}%` }}
               />

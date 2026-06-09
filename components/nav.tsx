@@ -129,7 +129,7 @@ export function Navigation({ userEmail }: NavigationProps) {
               Sign Out
             </Button>
 
-            <div className="px-2 pt-2 text-[10px] text-stone-400 dark:text-stone-550 border-t border-stone-100 dark:border-stone-800 mt-2 flex flex-col gap-0.5 font-sans leading-normal">
+            <div className="px-2 pt-2 text-[10px] text-stone-400 dark:text-stone-500 border-t border-stone-100 dark:border-stone-800 mt-2 flex flex-col gap-0.5 font-sans leading-normal">
               <span>Open Source & Free</span>
               <span>
                 By{' '}

@@ -189,13 +189,13 @@ export default function NotesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-stone-550 dark:text-stone-400 whitespace-pre-wrap line-clamp-4 leading-relaxed font-sans">
+                  <p className="text-xs text-stone-500 dark:text-stone-400 whitespace-pre-wrap line-clamp-4 leading-relaxed font-sans">
                     {note.content || 'No content.'}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-stone-100 dark:border-stone-800/80 pt-3 text-[10px] text-stone-400 font-mono">
-                  <span>
+                  <span suppressHydrationWarning>
                     Updated: {format(parseISO(note.updated_at), 'MMM d, yyyy h:mm a')}
                   </span>
                   <div className="flex items-center gap-1">

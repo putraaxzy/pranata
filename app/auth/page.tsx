@@ -6,12 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Lock, Mail, User, CheckCircle, Loader2 } from 'lucide-react'
+import { Lock, User, CheckCircle, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 const loginSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -93,7 +93,7 @@ export default function AuthPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--color-stone-800),transparent_70%)] opacity-30 pointer-events-none" />
         
         <div className="flex items-center gap-2.5 z-10">
-          <img src="/lg_pranata.png" className="size-9 invert" alt="Pranata Logo" />
+          <Image src="/lg_pranata.png" width={36} height={36} className="size-9 invert" alt="Pranata Logo" />
           <span className="text-xl font-bold tracking-tight">Pranata</span>
         </div>
 
@@ -140,7 +140,7 @@ export default function AuthPage() {
 
       <div className="w-full md:w-1/2 flex flex-col justify-center px-6 sm:px-16 lg:px-24 py-12 bg-white dark:bg-stone-900 relative">
         <div className="flex items-center gap-2 md:hidden absolute top-6 left-6">
-          <img src="/lg_pranata.png" className="size-7 dark:invert invert-0" alt="Pranata Logo" />
+          <Image src="/lg_pranata.png" width={28} height={28} className="size-7 dark:invert invert-0" alt="Pranata Logo" />
           <span className="text-sm font-bold tracking-tight text-stone-900 dark:text-stone-100">Pranata</span>
         </div>
 
@@ -276,7 +276,7 @@ export default function AuthPage() {
           <div className="pt-4 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs">
             {type === 'login' ? (
               <>
-                <span className="text-stone-500 dark:text-stone-400">Don't have an account?</span>
+                <span className="text-stone-500 dark:text-stone-400">{"Don't have an account?"}</span>
                 <button
                   type="button"
                   onClick={() => setType('register')}

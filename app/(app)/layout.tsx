@@ -4,9 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Navigation, LogoutButton } from '@/components/nav'
 import { QuickAddFab } from '@/components/quick-add-fab'
 import { NotificationListener } from '@/components/notification-listener'
-import { Bookmark, LogOut } from 'lucide-react'
+import { Bookmark } from 'lucide-react'
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import Image from 'next/image'
 
 export default async function AppLayout({
   children,
@@ -31,7 +31,7 @@ export default async function AppLayout({
       <div className="flex-1 flex flex-col md:pl-64 min-w-0">
         <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-stone-200 bg-white/80 backdrop-blur-md px-4 dark:border-stone-800 dark:bg-stone-900/80 md:hidden">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <img src="/lg_pranata.png" className="size-5 dark:invert invert-0" alt="Pranata Logo" />
+            <Image src="/lg_pranata.png" width={20} height={20} className="size-5 dark:invert invert-0" alt="Pranata Logo" />
             <span className="text-base font-bold tracking-tight text-stone-900 dark:text-stone-100">
               Pranata
             </span>

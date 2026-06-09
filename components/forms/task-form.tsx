@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
 
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -84,8 +83,9 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
       }
 
       if (onSuccess) onSuccess()
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(msg || 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -128,7 +128,7 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
         <div className="space-y-2">
           <Label htmlFor="task-priority">Priority</Label>
           <Select
-            onValueChange={(value) => form.setValue('priority', value as any)}
+            onValueChange={(value) => form.setValue('priority', value as TaskFormValues['priority'])}
             defaultValue={form.getValues('priority')}
           >
             <SelectTrigger id="task-priority">
@@ -146,7 +146,7 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
       <div className="space-y-2">
         <Label htmlFor="task-status">Status</Label>
         <Select
-          onValueChange={(value) => form.setValue('status', value as any)}
+          onValueChange={(value) => form.setValue('status', value as TaskFormValues['status'])}
           defaultValue={form.getValues('status')}
         >
           <SelectTrigger id="task-status">

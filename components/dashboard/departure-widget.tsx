@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Compass, Clock, MapPin, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Compass, Clock, MapPin, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { format, parse, differenceInMinutes, isAfter, isBefore, addMinutes } from 'date-fns'
+import { differenceInMinutes } from 'date-fns'
 
 interface DepartureSchedule {
   id: string
@@ -24,12 +24,16 @@ export function DepartureWidget({ schedule }: DepartureWidgetProps) {
   const [status, setStatus] = useState<'pending' | 'due_soon' | 'overdue' | 'none'>('none')
 
   useEffect(() => {
-    if (!schedule || !schedule.calculated_departure_time) {
-      setStatus('none')
-      return
-    }
+    let active = true
 
-    const timer = setInterval(() => {
+    const update = () => {
+      if (!active) return
+      if (!schedule || !schedule.calculated_departure_time) {
+        setStatus('none')
+        setTimeLeft('')
+        return
+      }
+
       const now = new Date()
       const [depHours, depMins] = schedule.calculated_departure_time.split(':').map(Number)
       
@@ -50,27 +54,16 @@ export function DepartureWidget({ schedule }: DepartureWidgetProps) {
         const mins = diffMins % 60
         setTimeLeft(hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`)
       }
-    }, 1000)
-
-    const now = new Date()
-    const [depHours, depMins] = schedule.calculated_departure_time.split(':').map(Number)
-    const departureTime = new Date()
-    departureTime.setHours(depHours, depMins, 0, 0)
-    const diffMins = differenceInMinutes(departureTime, now)
-    if (diffMins < 0) {
-      setStatus('overdue')
-      setTimeLeft('Passed')
-    } else if (diffMins <= 15) {
-      setStatus('due_soon')
-      setTimeLeft(`${diffMins}m remaining`)
-    } else {
-      setStatus('pending')
-      const hrs = Math.floor(diffMins / 60)
-      const mins = diffMins % 60
-      setTimeLeft(hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`)
     }
 
-    return () => clearInterval(timer)
+    const timeoutId = setTimeout(update, 0)
+    const intervalId = setInterval(update, 1000)
+
+    return () => {
+      active = false
+      clearTimeout(timeoutId)
+      clearInterval(intervalId)
+    }
   }, [schedule])
 
   if (status === 'none') {

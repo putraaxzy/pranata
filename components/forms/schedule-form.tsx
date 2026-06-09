@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -70,30 +70,23 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const travelMins = useWatch({ control: form.control, name: 'travel_duration_minutes' })
   const bufferMins = useWatch({ control: form.control, name: 'traffic_buffer_minutes' })
 
-  const [calcDeparture, setCalcDeparture] = useState('')
+  let calcDeparture = ''
+  if (type === 'work_departure' && workStartTime) {
+    const tMins = Number(travelMins) || 0
+    const bMins = Number(bufferMins) || 0
+    const [hoursStr, minutesStr] = workStartTime.split(':')
+    const hours = parseInt(hoursStr, 10)
+    const minutes = parseInt(minutesStr, 10)
 
-  useEffect(() => {
-    if (type === 'work_departure' && workStartTime) {
-      const tMins = Number(travelMins) || 0
-      const bMins = Number(bufferMins) || 0
-      const [hoursStr, minutesStr] = workStartTime.split(':')
-      const hours = parseInt(hoursStr, 10)
-      const minutes = parseInt(minutesStr, 10)
-
-      if (!isNaN(hours) && !isNaN(minutes)) {
-        const dateObj = new Date()
-        dateObj.setHours(hours, minutes, 0, 0)
-        dateObj.setMinutes(dateObj.getMinutes() - (tMins + bMins))
-        const h = String(dateObj.getHours()).padStart(2, '0')
-        const m = String(dateObj.getMinutes()).padStart(2, '0')
-        setCalcDeparture(`${h}:${m}`)
-      } else {
-        setCalcDeparture('')
-      }
-    } else {
-      setCalcDeparture('')
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      const dateObj = new Date()
+      dateObj.setHours(hours, minutes, 0, 0)
+      dateObj.setMinutes(dateObj.getMinutes() - (tMins + bMins))
+      const h = String(dateObj.getHours()).padStart(2, '0')
+      const m = String(dateObj.getMinutes()).padStart(2, '0')
+      calcDeparture = `${h}:${m}`
     }
-  }, [type, workStartTime, travelMins, bufferMins])
+  }
 
   const onSubmit = async (values: ScheduleFormValues) => {
     setLoading(true)
@@ -145,8 +138,9 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
       }
 
       if (onSuccess) onSuccess()
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(msg || 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -182,7 +176,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         <div className="space-y-2">
           <Label htmlFor="sched-type">Type</Label>
           <Select
-            onValueChange={(value) => form.setValue('type', value as any)}
+            onValueChange={(value) => form.setValue('type', value as ScheduleFormValues['type'])}
             defaultValue={form.getValues('type')}
           >
             <SelectTrigger id="sched-type">

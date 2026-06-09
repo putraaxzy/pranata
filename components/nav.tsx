@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -56,7 +57,7 @@ export function Navigation({ userEmail }: NavigationProps) {
     <>
       <aside className="fixed bottom-0 left-0 top-0 z-30 hidden w-64 border-r border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 md:flex flex-col">
         <div className="flex h-16 items-center gap-2 border-b border-stone-100 px-6 dark:border-stone-800">
-          <img src="/lg_pranata.png" className="size-5 dark:invert invert-0" alt="Pranata Logo" />
+          <Image src="/lg_pranata.png" width={20} height={20} className="size-5 dark:invert invert-0" alt="Pranata Logo" />
           <span className="text-lg font-bold tracking-tight text-stone-900 dark:text-stone-100">
             Pranata
           </span>

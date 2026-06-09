@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Calendar, Clock, MapPin, Trash2, Edit2, Plus, Compass, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,10 +37,9 @@ export default function SchedulePage() {
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const fetchSchedules = async () => {
-    setLoading(true)
+  const fetchSchedules = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -55,16 +54,20 @@ export default function SchedulePage() {
 
       if (error) throw error
       setSchedules(data || [])
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load schedules')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to load schedules')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchSchedules()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchSchedules()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchSchedules])
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -77,8 +80,9 @@ export default function SchedulePage() {
       if (error) throw error
       toast.success('Schedule deleted successfully')
       setSchedules(prev => prev.filter(s => s.id !== deletingId))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete schedule')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to delete schedule')
     } finally {
       setDeletingId(null)
     }
@@ -273,6 +277,7 @@ export default function SchedulePage() {
             <ScheduleForm
               onSuccess={() => {
                 setIsAddOpen(false)
+                setLoading(true)
                 fetchSchedules()
               }}
             />
@@ -292,6 +297,7 @@ export default function SchedulePage() {
                 initialValues={editingSchedule}
                 onSuccess={() => {
                   setEditingSchedule(null)
+                  setLoading(true)
                   fetchSchedules()
                 }}
               />

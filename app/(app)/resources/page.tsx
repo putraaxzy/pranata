@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Bookmark, Plus, Edit2, Trash2, Search, ExternalLink, Tag, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,10 +34,9 @@ export default function ResourcesPage() {
   const [editingResource, setEditingResource] = useState<Resource | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const fetchResources = async () => {
-    setLoading(true)
+  const fetchResources = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -51,16 +50,20 @@ export default function ResourcesPage() {
 
       if (error) throw error
       setResources(data || [])
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load resources')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to load resources')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchResources()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchResources()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchResources])
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -73,8 +76,9 @@ export default function ResourcesPage() {
       if (error) throw error
       toast.success('Resource deleted successfully')
       setResources(prev => prev.filter(r => r.id !== deletingId))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete resource')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to delete resource')
     } finally {
       setDeletingId(null)
     }
@@ -245,6 +249,7 @@ export default function ResourcesPage() {
             <ResourceForm
               onSuccess={() => {
                 setIsAddOpen(false)
+                setLoading(true)
                 fetchResources()
               }}
             />
@@ -264,6 +269,7 @@ export default function ResourcesPage() {
                 initialValues={editingResource}
                 onSuccess={() => {
                   setEditingResource(null)
+                  setLoading(true)
                   fetchResources()
                 }}
               />

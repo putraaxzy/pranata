@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Bell, Compass, Calendar, AlertCircle } from 'lucide-react'
+import { Bell, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -15,21 +15,31 @@ export function Greeting({ displayName }: GreetingProps) {
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
 
   useEffect(() => {
-    const hour = new Date().getHours()
-    if (hour >= 4 && hour < 11) {
-      setGreeting('Sugeng Enjang')
-    } else if (hour >= 11 && hour < 15) {
-      setGreeting('Wilujeng Siang')
-    } else if (hour >= 15 && hour < 18) {
-      setGreeting('Sugeng Sonten')
-    } else {
-      setGreeting('Sugeng Dalu')
+    const updateGreeting = () => {
+      const hour = new Date().getHours()
+      if (hour >= 4 && hour < 11) {
+        setGreeting('Sugeng Enjang')
+      } else if (hour >= 11 && hour < 15) {
+        setGreeting('Wilujeng Siang')
+      } else if (hour >= 15 && hour < 18) {
+        setGreeting('Sugeng Sonten')
+      } else {
+        setGreeting('Sugeng Dalu')
+      }
     }
 
-    if ('Notification' in window) {
-      if (Notification.permission === 'default') {
+    const checkNotifications = () => {
+      if ('Notification' in window && Notification.permission === 'default') {
         setShowNotificationPrompt(true)
       }
+    }
+
+    const t1 = setTimeout(updateGreeting, 0)
+    const t2 = setTimeout(checkNotifications, 0)
+
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
     }
   }, [])
 
@@ -48,7 +58,7 @@ export function Greeting({ displayName }: GreetingProps) {
         toast.warning('Notifications denied. You can manually enable them in your browser settings.')
         setShowNotificationPrompt(false)
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to request notification permission')
     }
   }

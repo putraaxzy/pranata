@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Coins, Plus, Edit2, Trash2, TrendingUp, TrendingDown, Wallet, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { TransactionForm } from '@/components/forms/transaction-form'
 import { toast } from 'sonner'
-import { format, parseISO, startOfMonth } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 interface Transaction {
   id: string
@@ -33,10 +33,9 @@ export default function MoneyTrackerPage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const fetchTransactions = async () => {
-    setLoading(true)
+  const fetchTransactions = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -51,16 +50,20 @@ export default function MoneyTrackerPage() {
 
       if (error) throw error
       setTransactions(data || [])
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load transactions')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to load transactions')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchTransactions()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchTransactions])
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -73,8 +76,9 @@ export default function MoneyTrackerPage() {
       if (error) throw error
       toast.success('Transaction deleted successfully')
       setTransactions(prev => prev.filter(t => t.id !== deletingId))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete transaction')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to delete transaction')
     } finally {
       setDeletingId(null)
     }
@@ -320,6 +324,7 @@ export default function MoneyTrackerPage() {
             <TransactionForm
               onSuccess={() => {
                 setIsAddOpen(false)
+                setLoading(true)
                 fetchTransactions()
               }}
             />
@@ -339,6 +344,7 @@ export default function MoneyTrackerPage() {
                 initialValues={editingTransaction}
                 onSuccess={() => {
                   setEditingTransaction(null)
+                  setLoading(true)
                   fetchTransactions()
                 }}
               />

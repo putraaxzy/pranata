@@ -7,7 +7,7 @@ import { ScheduleList } from '@/components/dashboard/schedule-list'
 import { TaskList } from '@/components/dashboard/task-list'
 import { NotesList } from '@/components/dashboard/notes-list'
 import { FinanceSummary } from '@/components/dashboard/finance-summary'
-import { Compass, AlertTriangle, Play } from 'lucide-react'
+import { Compass, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -22,6 +22,12 @@ export default async function DashboardPage() {
   if (!user) {
     return null
   }
+
+  let profile, schedules, tasks, transactions, notes
+  let totalIncome = 0
+  let totalExpense = 0
+  let netBalance = 0
+  let departureSchedule
 
   try {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -41,11 +47,11 @@ export default async function DashboardPage() {
       supabase.from('notes').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(3)
     ])
 
-    const { data: profile, error: profileErr } = profileResult
-    const { data: schedules, error: schedErr } = schedulesResult
-    const { data: tasks, error: taskErr } = tasksResult
-    const { data: transactions, error: txErr } = transactionsResult
-    const { data: notes, error: noteErr } = notesResult
+    const { data: p, error: profileErr } = profileResult
+    const { data: s, error: schedErr } = schedulesResult
+    const { data: t, error: taskErr } = tasksResult
+    const { data: tx, error: txErr } = transactionsResult
+    const { data: n, error: noteErr } = notesResult
 
     if (profileErr) throw profileErr
     if (schedErr) throw schedErr
@@ -53,68 +59,24 @@ export default async function DashboardPage() {
     if (txErr) throw txErr
     if (noteErr) throw noteErr
 
-    const departureSchedule = schedules?.find((s) => s.type === 'work_departure')
+    profile = p
+    schedules = s
+    tasks = t
+    transactions = tx
+    notes = n
 
-    let totalIncome = 0
-    let totalExpense = 0
-    transactions?.forEach((tx) => {
-      if (tx.type === 'income') {
-        totalIncome += Number(tx.amount)
+    departureSchedule = schedules?.find((s) => s.type === 'work_departure')
+
+    transactions?.forEach((item) => {
+      if (item.type === 'income') {
+        totalIncome += Number(item.amount)
       } else {
-        totalExpense += Number(tx.amount)
+        totalExpense += Number(item.amount)
       }
     })
-    const netBalance = totalIncome - totalExpense
-
-    return (
-      <div className="space-y-6">
-        <Greeting displayName={profile?.display_name || user.email?.split('@')[0]} />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <DepartureWidget schedule={departureSchedule} />
-
-            <ScheduleList schedules={schedules || []} />
-
-            <div className="border border-stone-200 bg-white p-4 rounded-xl dark:border-stone-800 dark:bg-stone-900 shadow-sm">
-              <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-400 mb-3 flex items-center gap-1.5">
-                <Compass className="size-4 text-stone-900 dark:text-stone-100" />
-                Quick Hub
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                <Link
-                  href="/schedule"
-                  className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
-                >
-                  <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Schedule</span>
-                </Link>
-                <Link
-                  href="/todo"
-                  className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
-                >
-                  <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Tasks</span>
-                </Link>
-                <Link
-                  href="/money"
-                  className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
-                >
-                  <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Money</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <FinanceSummary income={totalIncome} expense={totalExpense} balance={netBalance} />
-
-            <TaskList initialTasks={tasks || []} />
-
-            <NotesList notes={notes || []} />
-          </div>
-        </div>
-      </div>
-    )
-  } catch (err: any) {
+    netBalance = totalIncome - totalExpense
+  } catch (err) {
+    console.error('Dashboard data fetch error:', err)
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-md mx-auto px-4">
         <div className="p-3.5 rounded-full bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100 mb-4">
@@ -139,4 +101,53 @@ export default async function DashboardPage() {
       </div>
     )
   }
+
+  return (
+    <div className="space-y-6">
+      <Greeting displayName={profile?.display_name || user.email?.split('@')[0]} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <DepartureWidget schedule={departureSchedule} />
+
+          <ScheduleList schedules={schedules || []} />
+
+          <div className="border border-stone-200 bg-white p-4 rounded-xl dark:border-stone-800 dark:bg-stone-900 shadow-sm">
+            <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-400 mb-3 flex items-center gap-1.5">
+              <Compass className="size-4 text-stone-900 dark:text-stone-100" />
+              Quick Hub
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              <Link
+                href="/schedule"
+                className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
+              >
+                <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Schedule</span>
+              </Link>
+              <Link
+                href="/todo"
+                className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
+              >
+                <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Tasks</span>
+              </Link>
+              <Link
+                href="/money"
+                className="flex flex-col items-center justify-center p-3 rounded-lg border border-stone-100 bg-stone-50 hover:bg-stone-100 hover:border-stone-900 text-center dark:border-stone-850 dark:bg-stone-950 dark:hover:bg-stone-800/30 transition-all"
+              >
+                <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">Money</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <FinanceSummary income={totalIncome} expense={totalExpense} balance={netBalance} />
+
+          <TaskList initialTasks={tasks || []} />
+
+          <NotesList notes={notes || []} />
+        </div>
+      </div>
+    </div>
+  )
 }

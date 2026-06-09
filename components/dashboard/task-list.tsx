@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { CheckSquare, Square, CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react'
+import { Square, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -29,7 +29,7 @@ export function TaskList({ initialTasks }: TaskListProps) {
     const nextStatus = currentStatus === 'done' ? 'pending' : 'done'
 
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: nextStatus as any } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, status: nextStatus as Task['status'] } : t))
     )
 
     try {
@@ -41,9 +41,9 @@ export function TaskList({ initialTasks }: TaskListProps) {
       if (error) throw error
 
       toast.success(nextStatus === 'done' ? 'Task completed!' : 'Task reopened.')
-    } catch (err: any) {
+    } catch {
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as any } : t))
+        prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as Task['status'] } : t))
       )
       toast.error('Could not update task status')
     }

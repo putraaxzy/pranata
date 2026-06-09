@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { FileText, ChevronRight, Bookmark } from 'lucide-react'
+import { FileText, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'

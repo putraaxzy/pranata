@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, Calendar, CheckSquare, FileText, Coins, ArrowLeft, X } from 'lucide-react'
+import { Plus, Calendar, CheckSquare, FileText, Coins, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

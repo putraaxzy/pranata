@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { CheckSquare, Square, Trash2, Edit2, Search, Plus, ListFilter, AlertCircle } from 'lucide-react'
+import { CheckSquare, Square, Trash2, Edit2, Search, Plus, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,10 +42,9 @@ export default function TodoPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const fetchTasks = async () => {
-    setLoading(true)
+  const fetchTasks = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -59,16 +58,20 @@ export default function TodoPage() {
 
       if (error) throw error
       setTasks(data || [])
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load tasks')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to load tasks')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchTasks()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchTasks()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchTasks])
 
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,8 +102,9 @@ export default function TodoPage() {
       toast.success('Task created!')
       setTasks(prev => [data, ...prev])
       setQuickTitle('')
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create task')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to create task')
     } finally {
       setQuickLoading(false)
     }
@@ -110,7 +114,7 @@ export default function TodoPage() {
     const nextStatus = currentStatus === 'done' ? 'pending' : 'done'
 
     setTasks(prev =>
-      prev.map(t => (t.id === taskId ? { ...t, status: nextStatus as any } : t))
+      prev.map(t => (t.id === taskId ? { ...t, status: nextStatus as Task['status'] } : t))
     )
 
     try {
@@ -121,9 +125,9 @@ export default function TodoPage() {
 
       if (error) throw error
       toast.success(nextStatus === 'done' ? 'Task marked as complete!' : 'Task status reopened.')
-    } catch (err) {
+    } catch {
       setTasks(prev =>
-        prev.map(t => (t.id === taskId ? { ...t, status: currentStatus as any } : t))
+        prev.map(t => (t.id === taskId ? { ...t, status: currentStatus as Task['status'] } : t))
       )
       toast.error('Could not update task')
     }
@@ -140,8 +144,9 @@ export default function TodoPage() {
       if (error) throw error
       toast.success('Task deleted successfully')
       setTasks(prev => prev.filter(t => t.id !== deletingId))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete task')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to delete task')
     } finally {
       setDeletingId(null)
     }
@@ -355,13 +360,14 @@ export default function TodoPage() {
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-bold tracking-tight text-stone-900 dark:text-stone-100">Add New Task</DialogTitle>
+            <DialogTitle className="font-bold tracking-tight text-stone-900 dark:text-stone-100">Add Task</DialogTitle>
             <DialogDescription className="sr-only">Create a checklist item.</DialogDescription>
           </DialogHeader>
           <div className="py-2">
             <TaskForm
               onSuccess={() => {
                 setIsAddOpen(false)
+                setLoading(true)
                 fetchTasks()
               }}
             />
@@ -381,6 +387,7 @@ export default function TodoPage() {
                 initialValues={editingTask}
                 onSuccess={() => {
                   setEditingTask(null)
+                  setLoading(true)
                   fetchTasks()
                 }}
               />

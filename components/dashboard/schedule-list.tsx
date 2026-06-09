@@ -38,7 +38,7 @@ export function ScheduleList({ schedules }: ScheduleListProps) {
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-semibold text-stone-600 dark:text-stone-400 flex items-center gap-2">
           <Calendar className="size-4 text-stone-900 dark:text-stone-100" />
-          Today's Schedule
+          {"Today's Schedule"}
         </CardTitle>
         <Link href="/schedule" className="text-xs text-stone-900 dark:text-stone-100 hover:underline flex items-center gap-0.5 font-semibold">
           View All

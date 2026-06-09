@@ -1,14 +1,17 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 
 export default function Loading() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-stone-50 dark:bg-stone-950 font-sans">
       <div className="flex flex-col items-center gap-6">
         <div className="relative flex items-center justify-center">
-          <img 
+          <Image 
             src="/load_pranata.png" 
+            width={144}
+            height={144}
             className="w-36 h-36 animate-pulse dark:invert invert-0 object-contain" 
             alt="Pranata Logo" 
           />

@@ -95,8 +95,9 @@ export function TransactionForm({ onSuccess, initialValues }: TransactionFormPro
       }
 
       if (onSuccess) onSuccess()
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(msg || 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -134,7 +135,7 @@ export function TransactionForm({ onSuccess, initialValues }: TransactionFormPro
         <div className="space-y-2">
           <Label htmlFor="tx-type">Type</Label>
           <Select
-            onValueChange={(value) => form.setValue('type', value as any)}
+            onValueChange={(value) => form.setValue('type', value as TransactionFormValues['type'])}
             defaultValue={form.getValues('type')}
           >
             <SelectTrigger id="tx-type">

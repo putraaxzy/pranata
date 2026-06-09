@@ -76,8 +76,9 @@ export function NoteForm({ onSuccess, initialValues }: NoteFormProps) {
       }
 
       if (onSuccess) onSuccess()
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      toast.error(msg || 'An error occurred')
     } finally {
       setLoading(false)
     }

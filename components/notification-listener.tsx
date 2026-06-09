@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format, differenceInSeconds } from 'date-fns'
 
 export function NotificationListener() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const timeoutsRef = useRef<number[]>([])
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export function NotificationListener() {
     return () => {
       timeoutsRef.current.forEach((t) => window.clearTimeout(t))
     }
-  }, [])
+  }, [supabase])
 
   return null
 }

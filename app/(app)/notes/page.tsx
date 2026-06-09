@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { FileText, Search, Plus, Edit2, Trash2, Tag, AlertCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,10 +35,9 @@ export default function NotesPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  const fetchNotes = async () => {
-    setLoading(true)
+  const fetchNotes = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
@@ -52,16 +51,20 @@ export default function NotesPage() {
 
       if (error) throw error
       setNotes(data || [])
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load notes')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to load notes')
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchNotes()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchNotes()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchNotes])
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -74,8 +77,9 @@ export default function NotesPage() {
       if (error) throw error
       toast.success('Note deleted successfully')
       setNotes(prev => prev.filter(n => n.id !== deletingId))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete note')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(msg || 'Failed to delete note')
     } finally {
       setDeletingId(null)
     }
@@ -235,6 +239,7 @@ export default function NotesPage() {
             <NoteForm
               onSuccess={() => {
                 setIsAddOpen(false)
+                setLoading(true)
                 fetchNotes()
               }}
             />
@@ -254,6 +259,7 @@ export default function NotesPage() {
                 initialValues={editingNote}
                 onSuccess={() => {
                   setEditingNote(null)
+                  setLoading(true)
                   fetchNotes()
                 }}
               />

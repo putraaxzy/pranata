@@ -21,10 +21,17 @@ Pranata is a modern personal productivity dashboard designed for seamless task o
 
 ## Key Features
 
-*   **Javanese Greeting Header**: Custom greeting algorithm rendering classical Javanese welcomes (*Sugeng Enjang*, *Wilujeng Siang*, *Sugeng Sonten*, *Sugeng Dalu*) depending on the local hour.
+*   **Javanese Greeting Header**: Custom greeting algorithm rendering Javanese welcomes (*Sugeng Enjang*, *Wilujeng Siang*, *Sugeng Sonten*, *Sugeng Dalu*) depending on the hour of the user's selected timezone.
 *   **Smart Departure Calculator**: Computes exact departure alarms dynamically based on work start times, travel durations, and custom traffic buffers:
     $$\text{Departure Time} = \text{Work Start Time} - \text{Travel Duration} - \text{Traffic Buffer}$$
-*   **Time-bound Browser Alerts**: Schedules real-time local browser notifications to trigger exactly when you need to leave.
+*   **Timezone Settings (Manual/Auto)**: Choose between automatic browser-based timezone detection and manual timezone selections (WIB, WITA, WIT, UTC, SGT, EST, PST, etc.) to keep Javanese greetings, notifications, and scheduled events in sync with your local hour.
+*   **Flexible Recurring Windows**: Fine-tune weekly schedules with optional start/end active date ranges and custom skipped dates (exception dates) for holidays or vacation times.
+*   **Bulk Schedule Import**: Instantly paste formatted lists of activities (e.g., `06.15 - 06.30 Shower`, one per line) to bulk-populate your routine or dated planner.
+*   **Task Timer & Countdown**: Set optional start and end times for checklist items to see real-time pulsing **● Active Now** badges and dynamic countdowns. Toggle tasks to `in_progress` quickly with Play/Pause icons.
+*   **Recurring Weekly Schedules**: Define schedules that repeat on specific days of the week (e.g. Monday through Friday) without needing a fixed date, ideal for work shifts and study routines.
+*   **Schedule Done Tracking**: Mark events as completed with an optimistic-update toggle. Recurring templates can be completed specifically *for today*, leaving future weekly repetitions active.
+*   **Configurable Event Reminders**: Attach browser notifications to any schedule event with lead times of 5, 15, 30, or 60 minutes before the start time.
+*   **Time-bound Browser Alerts**: Schedules real-time local browser notifications to trigger exactly when you need to leave or when an event reminder fires.
 *   **Checklist Todo Tracker**: Modular lists with priority tags (`high`, `medium`, `low`) and optimistic client state overrides.
 *   **Notebook**: Minimalist card-based notebook with automated category extraction headers.
 *   **Personal Finance Ledger**: Interactive tracker to record monthly income and expenses with aggregate budget ratio meters.

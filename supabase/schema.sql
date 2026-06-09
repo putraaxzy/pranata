@@ -8,7 +8,8 @@ create table if not exists public.profiles (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   display_name text,
-  avatar_url text
+  avatar_url text,
+  timezone_setting text default 'auto'
 );
 
 -- 2. Create schedules table
@@ -18,7 +19,7 @@ create table if not exists public.schedules (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   title text not null,
-  date date not null,
+  date date,
   time text,
   type text not null check (type in ('general', 'work', 'study', 'workout', 'work_departure')),
   location text,
@@ -26,7 +27,15 @@ create table if not exists public.schedules (
   work_start_time text,
   travel_duration_minutes integer,
   traffic_buffer_minutes integer,
-  calculated_departure_time text
+  calculated_departure_time text,
+  is_done boolean default false,
+  is_recurring boolean default false,
+  recurring_days integer[] default null,
+  reminder_minutes integer default null,
+  start_date date default null,
+  end_date date default null,
+  completed_dates text[] default null,
+  exception_dates text[] default null
 );
 
 -- 3. Create tasks table
@@ -39,7 +48,9 @@ create table if not exists public.tasks (
   description text,
   due_date date,
   priority text not null check (priority in ('low', 'medium', 'high')),
-  status text not null check (status in ('pending', 'in_progress', 'done'))
+  status text not null check (status in ('pending', 'in_progress', 'done')),
+  start_time text,
+  end_time text
 );
 
 -- 4. Create notes table
@@ -155,3 +166,18 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Migration queries for updating existing databases to this schema version:
+--
+-- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS timezone_setting text DEFAULT 'auto';
+--
+-- ALTER TABLE public.schedules 
+--   ADD COLUMN IF NOT EXISTS start_date date DEFAULT null,
+--   ADD COLUMN IF NOT EXISTS end_date date DEFAULT null,
+--   ADD COLUMN IF NOT EXISTS completed_dates text[] DEFAULT null,
+--   ADD COLUMN IF NOT EXISTS exception_dates text[] DEFAULT null,
+--   ALTER COLUMN date DROP NOT NULL;
+--
+-- ALTER TABLE public.tasks 
+--   ADD COLUMN IF NOT EXISTS start_time text DEFAULT null,
+--   ADD COLUMN IF NOT EXISTS end_time text DEFAULT null;

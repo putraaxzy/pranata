@@ -18,13 +18,27 @@ const taskSchema = z.object({
   due_date: z.string().optional().or(z.literal('')),
   priority: z.enum(['low', 'medium', 'high']),
   status: z.enum(['pending', 'in_progress', 'done']),
+  start_time: z.string().optional().or(z.literal('')),
+  end_time: z.string().optional().or(z.literal('')),
+}).refine(data => {
+  if (data.end_time && !data.start_time) {
+    return false
+  }
+  return true
+}, {
+  message: "Start time is required if end time is set",
+  path: ["start_time"]
 })
 
 type TaskFormValues = z.infer<typeof taskSchema>
 
 interface TaskFormProps {
   onSuccess?: () => void
-  initialValues?: Partial<TaskFormValues> & { id?: string }
+  initialValues?: Partial<Omit<TaskFormValues, 'start_time' | 'end_time'>> & {
+    id?: string
+    start_time?: string | null
+    end_time?: string | null
+  }
 }
 
 export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
@@ -39,6 +53,8 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
       due_date: initialValues?.due_date || '',
       priority: initialValues?.priority || 'medium',
       status: initialValues?.status || 'pending',
+      start_time: initialValues?.start_time || '',
+      end_time: initialValues?.end_time || '',
     },
   })
 
@@ -62,6 +78,8 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
         due_date: values.due_date || null,
         priority: values.priority,
         status: values.status,
+        start_time: values.start_time || null,
+        end_time: values.end_time || null,
         user_id: user.id,
       }
 
@@ -93,45 +111,72 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="task-title">Title</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="task-title" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Title</Label>
         <Input
           id="task-title"
           placeholder="Task title..."
           {...form.register('title')}
+          className="h-10 rounded-lg text-sm"
         />
         {form.formState.errors.title && (
           <p className="text-xs text-red-500">{form.formState.errors.title.message}</p>
         )}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="task-description">Description (Optional)</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="task-description" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Description (Optional)</Label>
         <Textarea
           id="task-description"
           placeholder="More details about this task..."
           {...form.register('description')}
-          className="min-h-[80px]"
+          className="min-h-[80px] rounded-lg text-sm"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="task-due-date">Due Date</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="task-due-date" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Due Date (Optional)</Label>
+        <Input
+          id="task-due-date"
+          type="date"
+          {...form.register('due_date')}
+          className="h-10 rounded-lg text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="task-start-time" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Start Time (Optional)</Label>
           <Input
-            id="task-due-date"
-            type="date"
-            {...form.register('due_date')}
+            id="task-start-time"
+            type="time"
+            {...form.register('start_time')}
+            className="h-10 rounded-lg text-sm"
           />
+          {form.formState.errors.start_time && (
+            <p className="text-xs text-red-500">{form.formState.errors.start_time.message}</p>
+          )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="task-priority">Priority</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="task-end-time" className="text-xs font-semibold text-stone-700 dark:text-stone-300">End Time (Optional)</Label>
+          <Input
+            id="task-end-time"
+            type="time"
+            {...form.register('end_time')}
+            className="h-10 rounded-lg text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="task-priority" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Priority</Label>
           <Select
             onValueChange={(value) => form.setValue('priority', value as TaskFormValues['priority'])}
             defaultValue={form.getValues('priority')}
           >
-            <SelectTrigger id="task-priority">
+            <SelectTrigger id="task-priority" className="h-10 rounded-lg text-sm">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -141,28 +186,28 @@ export function TaskForm({ onSuccess, initialValues }: TaskFormProps) {
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="task-status">Status</Label>
-        <Select
-          onValueChange={(value) => form.setValue('status', value as TaskFormValues['status'])}
-          defaultValue={form.getValues('status')}
-        >
-          <SelectTrigger id="task-status">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1.5">
+          <Label htmlFor="task-status" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Status</Label>
+          <Select
+            onValueChange={(value) => form.setValue('status', value as TaskFormValues['status'])}
+            defaultValue={form.getValues('status')}
+          >
+            <SelectTrigger id="task-status" className="h-10 rounded-lg text-sm">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Button
         type="submit"
-        className="w-full bg-stone-900 hover:bg-stone-800 text-stone-50 dark:bg-stone-100 dark:hover:bg-stone-200 dark:text-stone-950 mt-2"
+        className="w-full h-10 bg-stone-900 hover:bg-stone-800 text-stone-50 dark:bg-stone-100 dark:hover:bg-stone-200 dark:text-stone-950 mt-2 rounded-lg font-semibold"
         disabled={loading}
       >
         {loading ? 'Saving...' : initialValues?.id ? 'Update Task' : 'Add Task'}

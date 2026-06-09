@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -13,9 +13,11 @@ import {
   Coins,
   Bookmark,
   LogOut,
+  Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { TIMEZONES } from '@/lib/timezone'
 
 interface NavigationProps {
   userEmail?: string
@@ -25,6 +27,40 @@ export function Navigation({ userEmail }: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [timezone, setTimezone] = useState<string>('auto')
+
+  useEffect(() => {
+    const fetchTz = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('timezone_setting')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+      if (!error && data?.timezone_setting) {
+        setTimezone(data.timezone_setting)
+      }
+    }
+    fetchTz()
+  }, [supabase])
+
+  const handleTimezoneChange = async (val: string) => {
+    setTimezone(val)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ timezone_setting: val })
+        .eq('user_id', session.user.id)
+      if (error) throw error
+      toast.success('Timezone updated!')
+      router.refresh()
+    } catch {
+      toast.error('Failed to save timezone')
+    }
+  }
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -112,7 +148,26 @@ export function Navigation({ userEmail }: NavigationProps) {
           </div>
         </nav>
 
-        <div className="border-t border-stone-100 p-4 dark:border-stone-800">
+        <div className="border-t border-stone-100 p-4 dark:border-stone-800 space-y-4">
+          <div className="px-2 py-1 space-y-1">
+            <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-stone-400 dark:text-stone-500">
+              <Globe className="size-3" />
+              <span>Timezone</span>
+            </div>
+            <select
+              id="nav-timezone"
+              value={timezone}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              className="w-full text-xs font-semibold py-1.5 px-2 bg-stone-50 border border-stone-200 text-stone-800 rounded-lg dark:bg-stone-950 dark:border-stone-800 dark:text-stone-200 outline-none cursor-pointer hover:border-stone-400 transition-colors"
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex flex-col gap-2">
             {userEmail && (
               <div className="px-2 py-1 text-xs text-stone-500 dark:text-stone-400 truncate" title={userEmail}>

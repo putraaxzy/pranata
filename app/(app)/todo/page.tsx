@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { CheckSquare, Square, Trash2, Edit2, Search, Plus, AlertCircle } from 'lucide-react'
+import { CheckSquare, Square, Trash2, Edit2, Search, Plus, AlertCircle, Clock, Play, Pause } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import {
 import { TaskForm } from '@/components/forms/task-form'
 import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
+import { getNow, getTodayStr } from '@/lib/timezone'
 
 interface Task {
   id: string
@@ -26,6 +27,8 @@ interface Task {
   due_date?: string
   priority: 'low' | 'medium' | 'high'
   status: 'pending' | 'in_progress' | 'done'
+  start_time?: string | null
+  end_time?: string | null
 }
 
 export default function TodoPage() {
@@ -34,10 +37,12 @@ export default function TodoPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  
+  const [timezone, setTimezone] = useState<string>('auto')
+  const [currentTime, setCurrentTime] = useState(new Date())
+
   const [quickTitle, setQuickTitle] = useState('')
   const [quickLoading, setQuickLoading] = useState(false)
-  
+
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -50,14 +55,24 @@ export default function TodoPage() {
       const user = session?.user
       if (!user) return
 
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const [tasksRes, profileRes] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('timezone_setting')
+          .eq('user_id', user.id)
+          .maybeSingle()
+      ])
 
-      if (error) throw error
-      setTasks(data || [])
+      if (tasksRes.error) throw tasksRes.error
+      if (profileRes.error) throw profileRes.error
+
+      setTasks(tasksRes.data || [])
+      setTimezone(profileRes.data?.timezone_setting || 'auto')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       toast.error(msg || 'Failed to load tasks')
@@ -72,6 +87,13 @@ export default function TodoPage() {
     }, 0)
     return () => clearTimeout(timer)
   }, [fetchTasks])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 20000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,7 +120,7 @@ export default function TodoPage() {
         .single()
 
       if (error) throw error
-      
+
       toast.success('Task created!')
       setTasks(prev => [data, ...prev])
       setQuickTitle('')
@@ -131,6 +153,60 @@ export default function TodoPage() {
       )
       toast.error('Could not update task')
     }
+  }
+
+  const handleToggleInProgress = async (taskId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'in_progress' ? 'pending' : 'in_progress'
+
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, status: nextStatus as Task['status'] } : t))
+    )
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: nextStatus })
+        .eq('id', taskId)
+
+      if (error) throw error
+      toast.success(nextStatus === 'in_progress' ? 'Task timer started!' : 'Task timer paused.')
+    } catch {
+      setTasks(prev =>
+        prev.map(t => (t.id === taskId ? { ...t, status: currentStatus as Task['status'] } : t))
+      )
+      toast.error('Could not update task status')
+    }
+  }
+
+  const getActiveTimerInfo = (task: Task) => {
+    if (currentTime && task.status === 'done') return null
+    if (!task.due_date || !task.start_time || !task.end_time) return null
+
+    const todayStr = getTodayStr(timezone)
+    if (task.due_date !== todayStr) return null
+
+    const now = getNow(timezone)
+    const currentH = now.getHours()
+    const currentM = now.getMinutes()
+    const currentMins = currentH * 60 + currentM
+
+    const [startH, startM] = task.start_time.split(':').map(Number)
+    const [endH, endM] = task.end_time.split(':').map(Number)
+    const startMins = startH * 60 + startM
+    const endMins = endH * 60 + endM
+
+    if (currentMins >= startMins && currentMins <= endMins) {
+      const remainingMins = endMins - currentMins
+      if (remainingMins <= 0) return null
+
+      if (remainingMins >= 60) {
+        const h = Math.floor(remainingMins / 60)
+        const m = remainingMins % 60
+        return m > 0 ? `${h}h ${m}m left` : `${h}h left`
+      }
+      return `${remainingMins}m left`
+    }
+    return null
   }
 
   const handleDelete = async () => {
@@ -178,7 +254,7 @@ export default function TodoPage() {
     const matchesSearch =
       task.title.toLowerCase().includes(search.toLowerCase()) ||
       (task.description && task.description.toLowerCase().includes(search.toLowerCase()))
-    
+
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter
 
@@ -286,29 +362,28 @@ export default function TodoPage() {
           {filteredTasks.map(task => (
             <Card
               key={task.id}
-              className={`border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 shadow-sm relative transition-opacity duration-200 ${
-                task.status === 'done' ? 'opacity-60' : 'opacity-100'
-              }`}
+              className={`border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900 shadow-sm relative transition-opacity duration-200 ${task.status === 'done' ? 'opacity-60' : 'opacity-100'
+                }`}
             >
               <CardContent className="p-4 flex items-start gap-3 justify-between">
                 <div className="flex items-start gap-3 min-w-0">
                   <button
                     onClick={() => handleToggleComplete(task.id, task.status)}
-                    className="mt-0.5 text-stone-400 hover:text-amber-800 dark:hover:text-amber-500 transition-colors shrink-0"
+                    className="mt-0.5 text-stone-400 hover:text-stone-800 dark:hover:text-stone-250 transition-colors shrink-0"
                     aria-label={task.status === 'done' ? 'Mark pending' : 'Mark done'}
                   >
                     {task.status === 'done' ? (
-                      <CheckSquare className="size-5 text-amber-800 dark:text-amber-500" />
+                      <CheckSquare className="size-5 text-stone-900 dark:text-stone-100" />
                     ) : (
                       <Square className="size-5" />
                     )}
                   </button>
 
-                  <div className="min-w-0 space-y-1">
-                    <h3 className={`text-sm font-semibold text-stone-800 dark:text-stone-100 truncate ${task.status === 'done' ? 'line-through text-stone-450' : ''}`}>
+                  <div className="min-w-0 space-y-1 flex-1">
+                    <h3 className={`text-sm font-semibold text-stone-800 dark:text-stone-100 truncate ${task.status === 'done' ? 'line-through text-stone-400 dark:text-stone-500' : ''}`}>
                       {task.title}
                     </h3>
-                    
+
                     {task.description && (
                       <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 pr-2">
                         {task.description}
@@ -327,11 +402,50 @@ export default function TodoPage() {
                           Due: {format(parseISO(task.due_date), 'MMM d, yyyy')}
                         </span>
                       )}
+                      {task.start_time && (
+                        <span className="text-[10px] text-stone-500 dark:text-stone-400 font-mono flex items-center gap-0.5">
+                          <Clock className="size-3" />
+                          {task.start_time} {task.end_time ? ` - ${task.end_time}` : ''}
+                        </span>
+                      )}
+                      {(() => {
+                        const activeTimerText = getActiveTimerInfo(task)
+                        const isActive = activeTimerText || task.status === 'in_progress'
+                        if (!isActive) return null
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-250/20 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 animate-pulse">
+                            <span className="size-1 bg-emerald-600 dark:bg-emerald-400 rounded-full" />
+                            {task.status === 'in_progress' ? (activeTimerText ? `Active (${activeTimerText})` : 'Active Now') : activeTimerText}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 self-center">
+                  {task.status !== 'done' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleToggleInProgress(task.id, task.status)}
+                      className={
+                        task.status === 'in_progress'
+                          ? "size-8 text-stone-900 hover:text-stone-950 rounded-lg bg-stone-100 hover:bg-stone-200 dark:text-stone-100 dark:bg-stone-800 dark:hover:bg-stone-700 animate-pulse"
+                          : "size-8 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
+                      }
+                      title={task.status === 'in_progress' ? 'Pause Action' : 'Start Action'}
+                    >
+                      {task.status === 'in_progress' ? (
+                        <Pause className="size-3.5" />
+                      ) : (
+                        <Play className="size-3.5" />
+                      )}
+                      <span className="sr-only">
+                        {task.status === 'in_progress' ? 'Pause' : 'Start'}
+                      </span>
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -345,7 +459,7 @@ export default function TodoPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setDeletingId(task.id)}
-                    className="size-8 text-red-505 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
+                    className="size-8 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
                   >
                     <Trash2 className="size-3.5" />
                     <span className="sr-only">Delete</span>

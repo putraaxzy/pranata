@@ -2,21 +2,23 @@
 
 import React, { useEffect, useState } from 'react'
 import { Bell, Calendar } from 'lucide-react'
-import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { getNow } from '@/lib/timezone'
+import { format } from 'date-fns'
 
 interface GreetingProps {
   displayName?: string
+  timezone?: string
 }
 
-export function Greeting({ displayName }: GreetingProps) {
+export function Greeting({ displayName, timezone = 'auto' }: GreetingProps) {
   const [greeting, setGreeting] = useState('Sugeng Enjang')
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false)
 
   useEffect(() => {
     const updateGreeting = () => {
-      const hour = new Date().getHours()
+      const hour = getNow(timezone).getHours()
       if (hour >= 4 && hour < 11) {
         setGreeting('Sugeng Enjang')
       } else if (hour >= 11 && hour < 15) {
@@ -41,7 +43,7 @@ export function Greeting({ displayName }: GreetingProps) {
       clearTimeout(t1)
       clearTimeout(t2)
     }
-  }, [])
+  }, [timezone])
 
   const handleRequestPermission = async () => {
     if (!('Notification' in window)) {
@@ -63,7 +65,7 @@ export function Greeting({ displayName }: GreetingProps) {
     }
   }
 
-  const todayStr = format(new Date(), 'EEEE, d MMMM yyyy')
+  const todayStr = format(getNow(timezone), 'EEEE, d MMMM yyyy')
 
   return (
     <div className="space-y-4">

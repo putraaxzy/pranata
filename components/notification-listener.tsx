@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { format, differenceInSeconds } from 'date-fns'
+import { differenceInSeconds } from 'date-fns'
+import { getNow, getTodayStr, getMomentInTimezone } from '@/lib/timezone'
+
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 
 export function NotificationListener() {
   const supabase = useMemo(() => createClient(), [])
@@ -29,47 +32,91 @@ export function NotificationListener() {
         const user = session?.user
         if (!user) return
 
-        const todayStr = format(new Date(), 'yyyy-MM-dd')
-        const { data: schedules } = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('date', todayStr)
-          .eq('type', 'work_departure')
+        const [profileResult, datedResult, recurringResult] = await Promise.all([
+          supabase.from('profiles').select('timezone_setting').eq('user_id', user.id).maybeSingle(),
+          supabase.from('schedules').select('*').eq('user_id', user.id).eq('is_done', false),
+          supabase.from('schedules').select('*').eq('user_id', user.id).eq('is_recurring', true)
+        ])
 
-        if (!schedules || schedules.length === 0) return
+        const tz = profileResult.data?.timezone_setting || 'auto'
+        const todayStr = getTodayStr(tz)
+        const todayDow = getNow(tz).getDay()
+
+        const datedSchedules = (datedResult.data || []).filter(s => s.date === todayStr)
+        const recurringSchedules = (recurringResult.data || []).filter((s) => {
+          const isDayMatched = s.recurring_days && s.recurring_days.includes(todayDow)
+          const isStarted = !s.start_date || s.start_date <= todayStr
+          const isNotEnded = !s.end_date || s.end_date >= todayStr
+          const isNotExcluded = !s.exception_dates || !s.exception_dates.includes(todayStr)
+          const isNotCompleted = !s.completed_dates || !s.completed_dates.includes(todayStr)
+          return isDayMatched && isStarted && isNotEnded && isNotExcluded && isNotCompleted
+        })
+
+        const datedIds = new Set(datedSchedules.map(s => s.id))
+        const uniqueRecurring = recurringSchedules.filter(s => !datedIds.has(s.id))
+        const allSchedules = [...datedSchedules, ...uniqueRecurring]
+
+        if (allSchedules.length === 0) return
 
         const now = new Date()
 
-        schedules.forEach((sched) => {
-          if (!sched.calculated_departure_time) return
+        allSchedules.forEach((sched) => {
+          if (sched.type === 'work_departure' && sched.calculated_departure_time) {
+            const departureTime = getMomentInTimezone(sched.calculated_departure_time, todayStr, tz)
+            const diffSec = differenceInSeconds(departureTime, now)
 
-          const [depHours, depMins] = sched.calculated_departure_time.split(':').map(Number)
-          const departureTime = new Date()
-          departureTime.setHours(depHours, depMins, 0, 0)
-
-          const diffSec = differenceInSeconds(departureTime, now)
-
-          if (diffSec <= 0 && diffSec > -300) {
-            new Notification('Time to Leave for Work! 🧭', {
-              body: `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`,
-              requireInteraction: true,
-              tag: `departure-${sched.id}`,
-            })
-          } else if (diffSec > 0) {
-            const tId = window.setTimeout(() => {
-              new Notification('Time to Leave for Work! 🧭', {
+            if (diffSec <= 0 && diffSec > -300) {
+              new Notification('Time to Leave for Work!', {
                 body: `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`,
                 requireInteraction: true,
                 tag: `departure-${sched.id}`,
               })
-            }, diffSec * 1000)
+            } else if (diffSec > 0) {
+              const tId = window.setTimeout(() => {
+                new Notification('Time to Leave for Work!', {
+                  body: `"${sched.title}" starts at ${sched.work_start_time}. Depart now to arrive on time!`,
+                  requireInteraction: true,
+                  tag: `departure-${sched.id}`,
+                })
+              }, diffSec * 1000)
 
-            timeoutsRef.current.push(tId)
+              timeoutsRef.current.push(tId)
+            }
+          }
+
+          if (sched.reminder_minutes && sched.reminder_minutes > 0 && sched.time) {
+            const eventTimeStr = sched.time.includes(' - ') ? sched.time.split(' - ')[0] : sched.time
+            const eventTime = getMomentInTimezone(eventTimeStr, todayStr, tz)
+
+            const reminderTime = new Date(eventTime.getTime() - sched.reminder_minutes * 60 * 1000)
+            const diffSec = differenceInSeconds(reminderTime, now)
+
+            const recurringLabel = sched.is_recurring ? ` (${DAY_LABELS[todayDow]})` : ''
+            const reminderLabel = sched.reminder_minutes >= 60
+              ? `${sched.reminder_minutes / 60} hour(s)`
+              : `${sched.reminder_minutes} minutes`
+
+            if (diffSec <= 0 && diffSec > -300) {
+              new Notification(`Upcoming: ${sched.title}${recurringLabel}`, {
+                body: `Starting in ${reminderLabel} at ${eventTimeStr}.`,
+                requireInteraction: true,
+                tag: `reminder-${sched.id}`,
+              })
+            } else if (diffSec > 0) {
+              const tId = window.setTimeout(() => {
+                new Notification(`Upcoming: ${sched.title}${recurringLabel}`, {
+                  body: `Starting in ${reminderLabel} at ${eventTimeStr}.`,
+                  requireInteraction: true,
+                  tag: `reminder-${sched.id}`,
+                })
+              }, diffSec * 1000)
+
+              timeoutsRef.current.push(tId)
+            }
           }
         })
       } catch (err) {
-        console.error('Error setting up departure notification timers:', err)
+        console.error('Error setting up notification timers:', err)
       }
     }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useForm, useWatch, type SubmitHandler } from 'react-hook-form'
+import { useForm, useWatch, type SubmitHandler, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { createClient } from '@/lib/supabase/client'
@@ -112,7 +112,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const initialEndTime = hasRange ? initialTime.split(' - ')[1] : ''
 
   const form = useForm<ScheduleFormValues>({
-    resolver: zodResolver(scheduleSchema) as any,
+    resolver: zodResolver(scheduleSchema) as Resolver<ScheduleFormValues>,
     defaultValues: {
       title: initialValues?.title || '',
       date: initialValues?.date || new Date().toISOString().split('T')[0],
@@ -140,6 +140,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const bufferMins = useWatch({ control: form.control, name: 'traffic_buffer_minutes' })
   const isRecurring = useWatch({ control: form.control, name: 'is_recurring' })
   const currentDays = useWatch({ control: form.control, name: 'recurring_days' }) || []
+  const timezone = useWatch({ control: form.control, name: 'timezone' })
 
   let calcDeparture = ''
   if (type === 'work_departure' && workStartTime) {
@@ -453,7 +454,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         <div className="flex gap-2">
           <Select
             onValueChange={(value) => { if (value) form.setValue('timezone', value) }}
-            value={form.watch('timezone') ?? ''}
+            value={timezone ?? ''}
           >
             <SelectTrigger id="sched-timezone" className="flex-1 h-10 rounded-lg text-sm">
               <SelectValue placeholder="Select timezone" />

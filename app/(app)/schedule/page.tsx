@@ -154,7 +154,7 @@ export default function SchedulePage() {
           const eventDate = toDate(`${s.date}T${s.time}`, { timeZone: s.timezone })
           displayTime = formatInTimeZone(eventDate, localTz, 'HH:mm')
           isDifferentTz = true
-        } catch (e) {
+        } catch {
           // fallback todo
         }
       }

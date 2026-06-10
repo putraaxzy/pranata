@@ -32,6 +32,29 @@ const getTodayStr = (tz: string) => {
   return formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd')
 }
 
+const getDisplayTimeAndTz = (
+  dateStr: string | null,
+  timeStr: string | undefined,
+  timezoneStr: string | undefined,
+  localTz: string
+) => {
+  let displayTime = timeStr
+  let isDifferentTz = false
+
+  if (timezoneStr && timeStr && timezoneStr !== localTz) {
+    try {
+      const datePart = dateStr || format(new Date(), 'yyyy-MM-dd')
+      const eventDate = toDate(`${datePart}T${timeStr}`, { timeZone: timezoneStr })
+      displayTime = formatInTimeZone(eventDate, localTz, 'HH:mm')
+      isDifferentTz = true
+    } catch (err) {
+      console.warn(`Timezone conversion failed for timezone: ${timezoneStr}, date: ${dateStr}, time: ${timeStr}`, err)
+    }
+  }
+
+  return { displayTime, isDifferentTz }
+}
+
 interface Schedule {
   id: string
   title: string
@@ -147,20 +170,6 @@ export default function SchedulePage() {
     const maxProjectionDate = addDays(today, 30)
 
     schedules.forEach(s => {
-      let displayTime = s.time
-      let isDifferentTz = false
-      if (s.timezone && s.time && s.timezone !== localTz) {
-        try {
-          const eventDate = toDate(`${s.date}T${s.time}`, { timeZone: s.timezone })
-          displayTime = formatInTimeZone(eventDate, localTz, 'HH:mm')
-          isDifferentTz = true
-        } catch {
-          // fallback todo
-        }
-      }
-
-      const sForDisplay = { ...s, displayTime, isDifferentTz }
-
       if (s.is_recurring && s.recurring_days && s.recurring_days.length > 0) {
         const startD = s.date ? parseISO(s.date) : today
         const endD = s.end_date ? parseISO(s.end_date) : maxProjectionDate
@@ -170,16 +179,18 @@ export default function SchedulePage() {
         while (!isAfter(currentD, limitDate)) {
           if (!isBefore(currentD, today) && s.recurring_days.includes(getDay(currentD))) {
             const dateStr = format(currentD, 'yyyy-MM-dd')
+            const { displayTime, isDifferentTz } = getDisplayTimeAndTz(dateStr, s.time, s.timezone, localTz)
             if (!groups[dateStr]) groups[dateStr] = []
-            groups[dateStr].push({ ...sForDisplay, id: `${s.id}-${dateStr}` })
+            groups[dateStr].push({ ...s, displayTime, isDifferentTz, id: `${s.id}-${dateStr}` })
           }
           currentD = addDays(currentD, 1)
         }
       } else if (s.date) {
+        const { displayTime, isDifferentTz } = getDisplayTimeAndTz(s.date, s.time, s.timezone, localTz)
         if (!groups[s.date]) {
           groups[s.date] = []
         }
-        groups[s.date].push(sForDisplay)
+        groups[s.date].push({ ...s, displayTime, isDifferentTz })
       }
     })
 

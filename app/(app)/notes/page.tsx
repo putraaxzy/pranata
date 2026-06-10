@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { NoteForm } from '@/components/forms/note-form'
+import { NoteEditorOverlay } from '@/components/note-editor-overlay'
 import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
 
@@ -22,7 +23,33 @@ interface Note {
   title: string
   content?: string
   category?: string
+  created_at: string
   updated_at: string
+}
+
+const renderNoteContent = (content: string | undefined) => {
+  if (!content) return 'No content.'
+
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = content.split(urlRegex)
+
+  return parts.map((part, index) => {
+    if (urlRegex.test(part)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-stone-900 dark:text-stone-100 font-semibold underline break-all hover:text-stone-700 dark:hover:text-stone-300"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      )
+    }
+    return part
+  })
 }
 
 export default function NotesPage() {
@@ -176,7 +203,8 @@ export default function NotesPage() {
           {filteredNotes.map(note => (
             <Card
               key={note.id}
-              className="border-stone-200 bg-white hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900 shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300 relative group overflow-hidden"
+              onClick={() => setEditingNote(note)}
+              className="cursor-pointer border-stone-200 bg-white hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900 shadow-sm flex flex-col justify-between hover:shadow-md transition-all duration-300 relative group overflow-hidden"
             >
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-stone-900/60 dark:bg-stone-100/60" />
 
@@ -194,7 +222,7 @@ export default function NotesPage() {
                     )}
                   </div>
                   <p className="text-xs text-stone-500 dark:text-stone-400 whitespace-pre-wrap line-clamp-4 leading-relaxed font-sans">
-                    {note.content || 'No content.'}
+                    {renderNoteContent(note.content)}
                   </p>
                 </div>
 
@@ -206,7 +234,10 @@ export default function NotesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setEditingNote(note)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingNote(note);
+                      }}
                       className="size-7 text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800"
                     >
                       <Edit2 className="size-3" />
@@ -215,7 +246,10 @@ export default function NotesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setDeletingId(note.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingId(note.id);
+                      }}
                       className="size-7 text-red-500 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/25"
                     >
                       <Trash2 className="size-3" />
@@ -229,44 +263,24 @@ export default function NotesPage() {
         </div>
       )}
 
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-bold tracking-tight text-stone-900 dark:text-stone-100">Add New Note</DialogTitle>
-            <DialogDescription className="sr-only">Create a notebook item.</DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <NoteForm
-              onSuccess={() => {
-                setIsAddOpen(false)
-                setLoading(true)
-                fetchNotes()
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <NoteEditorOverlay
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSuccess={() => {
+          setLoading(true)
+          fetchNotes()
+        }}
+      />
 
-      <Dialog open={!!editingNote} onOpenChange={(v) => { if (!v) setEditingNote(null) }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-bold tracking-tight text-stone-900 dark:text-stone-100">Edit Note</DialogTitle>
-            <DialogDescription className="sr-only">Edit a notebook item.</DialogDescription>
-          </DialogHeader>
-          {editingNote && (
-            <div className="py-2">
-              <NoteForm
-                initialValues={editingNote}
-                onSuccess={() => {
-                  setEditingNote(null)
-                  setLoading(true)
-                  fetchNotes()
-                }}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <NoteEditorOverlay
+        isOpen={!!editingNote}
+        onClose={() => setEditingNote(null)}
+        initialValues={editingNote}
+        onSuccess={() => {
+          setLoading(true)
+          fetchNotes()
+        }}
+      />
 
       <Dialog open={!!deletingId} onOpenChange={(v) => { if (!v) setDeletingId(null) }}>
         <DialogContent className="sm:max-w-sm">

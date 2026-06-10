@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { createClient } from '@/lib/supabase/client'
@@ -10,10 +10,24 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+const timezones = [
+  { id: 'Asia/Jakarta', label: 'Asia/Jakarta' },
+  { id: 'Asia/Makassar', label: 'Asia/Makassar' },
+  { id: 'Asia/Jayapura', label: 'Asia/Jayapura' },
+  { id: 'UTC', label: 'UTC' },
+]
+
+const parseScheduleLine = (line: string) => {
+  const parts = line.split(' ')
+  if (parts[1] === '-') {
+    return { time: `${parts[0]} - ${parts[2]}`, title: parts.slice(3).join(' ') }
+  }
+  return { time: parts[0], title: parts.slice(1).join(' ') }
+}
 
 const REMINDER_OPTIONS = [
   { value: '0', label: 'No Reminder' },
@@ -23,7 +37,7 @@ const REMINDER_OPTIONS = [
   { value: '60', label: '1 hour before' },
 ]
 
-const scheduleSchema = z.object({
+const scheduleBaseSchema = z.object({
   title: z.string().optional(),
   date: z.string().optional().or(z.literal('')),
   startTime: z.string().optional().or(z.literal('')),
@@ -38,41 +52,33 @@ const scheduleSchema = z.object({
   recurring_days: z.array(z.number()).default([]),
   timezone: z.string().min(1, 'Timezone is required'),
   end_date: z.string().optional().or(z.literal('')),
-}).refine(data => {
-  if (!data.is_bulk && data.endTime && !data.startTime) {
-    return false
-  }
-  return true
-}, {
-  message: "Start time is required if end time is set",
-  path: ["startTime"]
-}).refine(data => {
-  if (!data.is_bulk && !data.is_recurring && !data.date) {
-    return false
-  }
-  return true
-}, {
-  message: "Date is required for non-recurring events",
-  path: ["date"]
-}).refine(data => {
-  if (data.is_recurring && data.recurring_days.length === 0) {
-    return false
-  }
-  return true
-}, {
-  message: "Select at least one day for recurring events",
-  path: ["recurring_days"]
-}).refine(data => {
-  if (data.is_recurring && data.start_date && data.end_date) {
-    return data.start_date <= data.end_date
-  }
-  return true
-}, {
-  message: "Start date must be before or equal to end date",
-  path: ["start_date"]
+  start_date: z.string().optional().or(z.literal('')),
+  exception_dates: z.string().optional().or(z.literal('')),
+  is_bulk: z.boolean().default(false),
+  reminder_minutes: z.number().optional(),
 })
 
-type ScheduleFormValues = z.infer<typeof scheduleSchema>
+const scheduleSchema = scheduleBaseSchema
+  .refine(data => {
+    if (!data.is_bulk && data.endTime && !data.startTime) return false
+    return true
+  }, { message: 'Start time is required if end time is set', path: ['startTime'] })
+  .refine(data => {
+    if (!data.is_bulk && !data.is_recurring && !data.date) return false
+    return true
+  }, { message: 'Date is required for non-recurring events', path: ['date'] })
+  .refine(data => {
+    if (data.is_recurring && data.recurring_days.length === 0) return false
+    return true
+  }, { message: 'Select at least one day for recurring events', path: ['recurring_days'] })
+  .refine(data => {
+    if (data.is_recurring && data.start_date && data.end_date) {
+      return data.start_date <= data.end_date
+    }
+    return true
+  }, { message: 'Start date must be before or equal to end date', path: ['start_date'] })
+
+type ScheduleFormValues = z.output<typeof scheduleBaseSchema>
 
 interface ScheduleFormProps {
   onSuccess?: () => void
@@ -93,6 +99,7 @@ interface ScheduleFormProps {
   }
 }
 
+
 export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const [loading, setLoading] = useState(false)
   const [isBulkMode, setIsBulkMode] = useState(false)
@@ -105,7 +112,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
   const initialEndTime = hasRange ? initialTime.split(' - ')[1] : ''
 
   const form = useForm<ScheduleFormValues>({
-    resolver: zodResolver(scheduleSchema),
+    resolver: zodResolver(scheduleSchema) as any,
     defaultValues: {
       title: initialValues?.title || '',
       date: initialValues?.date || new Date().toISOString().split('T')[0],
@@ -121,6 +128,9 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
       recurring_days: initialValues?.recurring_days || [],
       timezone: initialValues?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       end_date: initialValues?.end_date || '',
+      start_date: initialValues?.start_date || '',
+      exception_dates: initialValues?.exception_dates?.join(', ') || '',
+      reminder_minutes: initialValues?.reminder_minutes != null ? initialValues.reminder_minutes : undefined
     },
   })
 
@@ -138,7 +148,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
     const [hoursStr, minutesStr] = workStartTime.split(':')
     const hours = parseInt(hoursStr, 10)
     const minutes = parseInt(minutesStr, 10)
-
     if (!isNaN(hours) && !isNaN(minutes)) {
       const dateObj = new Date()
       dateObj.setHours(hours, minutes, 0, 0)
@@ -158,12 +167,10 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
     }
   }
 
-  const onSubmit = async (values: ScheduleFormValues) => {
+  const onSubmit: SubmitHandler<ScheduleFormValues> = async (values) => {
     setLoading(true)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
 
       if (!user) {
@@ -173,7 +180,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
       }
 
       const cleanExceptionDates = values.exception_dates
-        ? values.exception_dates.split(',').map(d => d.trim()).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        ? values.exception_dates.split(',').map((d) => d.trim()).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
         : null
 
       if (isBulkMode) {
@@ -200,7 +207,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
             is_done: false,
             is_recurring: values.is_recurring,
             recurring_days: values.is_recurring ? values.recurring_days : null,
-            reminder_minutes: values.reminder_minutes > 0 ? values.reminder_minutes : null,
+            reminder_minutes: values.reminder_minutes && values.reminder_minutes > 0 ? values.reminder_minutes : null,
             start_date: values.is_recurring ? (values.start_date || null) : null,
             end_date: values.is_recurring ? (values.end_date || null) : null,
             exception_dates: values.is_recurring ? (cleanExceptionDates && cleanExceptionDates.length > 0 ? cleanExceptionDates : null) : null,
@@ -208,10 +215,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
           }
         })
 
-        const { error } = await supabase
-          .from('schedules')
-          .insert(payloads)
-
+        const { error } = await supabase.from('schedules').insert(payloads)
         if (error) throw error
         toast.success(`Successfully imported ${payloads.length} events!`)
       } else {
@@ -234,18 +238,11 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         }
 
         if (initialValues?.id) {
-          const { error } = await supabase
-            .from('schedules')
-            .update(payload)
-            .eq('id', initialValues.id)
-
+          const { error } = await supabase.from('schedules').update(payload).eq('id', initialValues.id)
           if (error) throw error
           toast.success('Schedule updated successfully!')
         } else {
-          const { error } = await supabase
-            .from('schedules')
-            .insert(payload)
-
+          const { error } = await supabase.from('schedules').insert(payload)
           if (error) throw error
           toast.success('Schedule added successfully!')
         }
@@ -267,10 +264,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         <div className="flex rounded-lg bg-stone-100 p-1 dark:bg-stone-850">
           <button
             type="button"
-            onClick={() => {
-              setIsBulkMode(false)
-              form.setValue('is_bulk', false)
-            }}
+            onClick={() => { setIsBulkMode(false); form.setValue('is_bulk', false) }}
             className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${!isBulkMode
               ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
               : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
@@ -280,10 +274,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setIsBulkMode(true)
-              form.setValue('is_bulk', true)
-            }}
+            onClick={() => { setIsBulkMode(true); form.setValue('is_bulk', true) }}
             className={`flex-1 text-xs font-semibold py-1.5 rounded-md transition-all ${isBulkMode
               ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-900 dark:text-stone-50'
               : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
@@ -322,18 +313,18 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         </div>
       )}
 
-      <div className="flex items-center justify-between py-1 border-b border-stone-100 dark:border-stone-850 pb-3">
+      <div className="flex items-center justify-between py-1 border-b border-stone-100 dark:border-stone-800 pb-3">
         <div>
-          <Label htmlFor="sched-recurring" className="text-xs font-semibold text-stone-700 dark:text-stone-300 cursor-pointer">Recurring Weekly</Label>
+          <Label htmlFor="sched-recurring-toggle" className="text-xs font-semibold text-stone-700 dark:text-stone-300 cursor-pointer">Recurring Weekly</Label>
           <p className="text-[10px] text-stone-400 mt-0.5">Repeat event on specific days every week</p>
         </div>
         <button
-          id="sched-recurring"
+          id="sched-recurring-toggle"
           type="button"
           role="switch"
           aria-checked={isRecurring}
           onClick={() => form.setValue('is_recurring', !isRecurring, { shouldValidate: true })}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${isRecurring ? 'bg-stone-900 dark:bg-stone-100' : 'bg-stone-200 dark:bg-stone-850'
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${isRecurring ? 'bg-stone-900 dark:bg-stone-100' : 'bg-stone-200 dark:bg-stone-700'
             }`}
         >
           <span
@@ -353,7 +344,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                   key={label}
                   type="button"
                   onClick={() => toggleRecurringDay(idx)}
-                  className={`text-[10px] font-semibold py-2 rounded-lg border transition-all ${recurringDays.includes(idx)
+                  className={`text-[10px] font-semibold py-2 rounded-lg border transition-all ${currentDays.includes(idx)
                     ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-950 dark:border-stone-100 shadow-sm'
                     : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-700 dark:hover:border-stone-500'
                     }`}
@@ -380,7 +371,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                 <p className="text-xs text-red-500">{form.formState.errors.start_date.message}</p>
               )}
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="sched-end-date" className="text-xs font-semibold text-stone-700 dark:text-stone-300">End Date (Optional)</Label>
               <Input
@@ -444,7 +434,7 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
           <Label htmlFor="sched-reminder" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Reminder</Label>
           <Select
             onValueChange={(value) => form.setValue('reminder_minutes', Number(value))}
-            defaultValue={String(form.getValues('reminder_minutes'))}
+            defaultValue={String(form.getValues('reminder_minutes') ?? 0)}
           >
             <SelectTrigger id="sched-reminder" className="h-10 rounded-lg text-sm">
               <SelectValue placeholder="Select reminder" />
@@ -458,175 +448,35 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="sched-timezone">Timezone</Label>
-          <div className="flex gap-2">
-            <Select
-              onValueChange={(value) => form.setValue('timezone', value)}
-              value={form.watch('timezone')}
-            >
-              <SelectTrigger id="sched-timezone" className="flex-1">
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent>
-                {timezones.map(tz => (
-                  <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => form.setValue('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)}
-              className="shrink-0 text-xs px-2"
-              title="Auto-detect local timezone"
-            >
-              Auto
-            </Button>
-          </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="sched-timezone" className="text-xs font-semibold text-stone-700 dark:text-stone-300">Timezone</Label>
+        <div className="flex gap-2">
+          <Select
+            onValueChange={(value) => { if (value) form.setValue('timezone', value) }}
+            value={form.watch('timezone') ?? ''}
+          >
+            <SelectTrigger id="sched-timezone" className="flex-1 h-10 rounded-lg text-sm">
+              <SelectValue placeholder="Select timezone" />
+            </SelectTrigger>
+            <SelectContent>
+              {timezones.map(tz => (
+                <SelectItem key={tz.id} value={tz.id}>{tz.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => form.setValue('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)}
+            className="shrink-0 text-xs px-2 h-10 rounded-lg"
+            title="Auto-detect local timezone"
+          >
+            Auto
+          </Button>
         </div>
-      </div>
-
-      <div className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-stone-50/50 dark:bg-stone-900/40 space-y-3">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="sched-recurring"
-            checked={isRecurring}
-            onCheckedChange={(c) => form.setValue('is_recurring', !!c)}
-          />
-          <Label htmlFor="sched-recurring" className="font-semibold cursor-pointer">Recurring Event</Label>
-        </div>
-
-        {isRecurring && (
-          <div className="space-y-3 pt-2 pl-6">
-            <div className="space-y-2">
-              <Label className="text-xs">Repeat on days:</Label>
-              <div className="flex flex-wrap gap-2">
-                {daysOfWeek.map(day => {
-                  const isSelected = currentDays.includes(day.id)
-                  return (
-                    <button
-                      key={day.id}
-                      type="button"
-                      onClick={() => {
-                        const newDays = isSelected
-                          ? currentDays.filter(d => d !== day.id)
-                          : [...currentDays, day.id]
-                        form.setValue('recurring_days', newDays)
-                      }}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${isSelected
-                        ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-900 dark:border-stone-100'
-                        : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
-                        }`}
-                    >
-                      {day.label}
-                    </button>
-                  )
-                })}
-              </div>
-              {isRecurring && currentDays.length === 0 && (
-                <p className="text-[10px] text-red-500">Please select at least one day.</p>
-              )}
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="sched-end-date" className="text-xs">End Date (Optional)</Label>
-              <Input
-                id="sched-end-date"
-                type="date"
-                {...form.register('end_date')}
-                className="max-w-[200px]"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="sched-timezone">Timezone</Label>
-          <div className="flex gap-2">
-            <Select
-              onValueChange={(value) => form.setValue('timezone', value)}
-              value={form.watch('timezone')}
-            >
-              <SelectTrigger id="sched-timezone" className="flex-1">
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent>
-                {timezones.map(tz => (
-                  <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => form.setValue('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)}
-              className="shrink-0 text-xs px-2"
-              title="Auto-detect local timezone"
-            >
-              Auto
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="border border-stone-200 dark:border-stone-800 rounded-lg p-3 bg-stone-50/50 dark:bg-stone-900/40 space-y-3">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="sched-recurring"
-            checked={isRecurring}
-            onCheckedChange={(c) => form.setValue('is_recurring', !!c)}
-          />
-          <Label htmlFor="sched-recurring" className="font-semibold cursor-pointer">Recurring Event</Label>
-        </div>
-
-        {isRecurring && (
-          <div className="space-y-3 pt-2 pl-6">
-            <div className="space-y-2">
-              <Label className="text-xs">Repeat on days:</Label>
-              <div className="flex flex-wrap gap-2">
-                {daysOfWeek.map(day => {
-                  const isSelected = currentDays.includes(day.id)
-                  return (
-                    <button
-                      key={day.id}
-                      type="button"
-                      onClick={() => {
-                        const newDays = isSelected
-                          ? currentDays.filter(d => d !== day.id)
-                          : [...currentDays, day.id]
-                        form.setValue('recurring_days', newDays)
-                      }}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${isSelected
-                          ? 'bg-stone-900 text-stone-50 border-stone-900 dark:bg-stone-100 dark:text-stone-900 dark:border-stone-100'
-                          : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
-                        }`}
-                    >
-                      {day.label}
-                    </button>
-                  )
-                })}
-              </div>
-              {isRecurring && currentDays.length === 0 && (
-                <p className="text-[10px] text-red-500">Please select at least one day.</p>
-              )}
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="sched-end-date" className="text-xs">End Date (Optional)</Label>
-              <Input
-                id="sched-end-date"
-                type="date"
-                {...form.register('end_date')}
-                className="max-w-[200px]"
-              />
-            </div>
-          </div>
+        {form.formState.errors.timezone && (
+          <p className="text-xs text-red-500">{form.formState.errors.timezone.message}</p>
         )}
       </div>
 
@@ -645,7 +495,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                 <p className="text-xs text-red-500">{form.formState.errors.startTime.message}</p>
               )}
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="sched-end-time" className="text-xs font-semibold text-stone-700 dark:text-stone-300">End Time (Optional)</Label>
               <Input
@@ -680,7 +529,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
       ) : (
         <div className="border-l-2 border-stone-900 bg-stone-50/50 p-4 rounded-r-lg space-y-4 dark:border-stone-100 dark:bg-stone-900/40">
           <h4 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">Work Departure Parameters</h4>
-
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1.5">
               <Label htmlFor="sched-work-start" className="text-[10px] font-semibold text-stone-600 dark:text-stone-400">Work Start</Label>
@@ -691,7 +539,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                 className="h-9 rounded-lg text-xs"
               />
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="sched-travel" className="text-[10px] font-semibold text-stone-600 dark:text-stone-400">Travel (mins)</Label>
               <Input
@@ -701,7 +548,6 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
                 className="h-9 rounded-lg text-xs"
               />
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="sched-buffer" className="text-[10px] font-semibold text-stone-600 dark:text-stone-400">Buffer (mins)</Label>
               <Input
@@ -712,9 +558,8 @@ export function ScheduleForm({ onSuccess, initialValues }: ScheduleFormProps) {
               />
             </div>
           </div>
-
           {calcDeparture && (
-            <div className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center justify-between border-t border-stone-200/50 pt-2.5 mt-2.5 dark:border-stone-850">
+            <div className="text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center justify-between border-t border-stone-200/50 pt-2.5 mt-2.5 dark:border-stone-800">
               <span>Calculated Departure:</span>
               <span className="text-stone-900 dark:text-stone-100 font-bold text-sm">{calcDeparture}</span>
             </div>
